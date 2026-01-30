@@ -118,7 +118,15 @@ export function CRMContent({ leads }: CRMContentProps) {
 
   const handleStageChange = async (lead: Lead, newStage: string) => {
     try {
-      await updateLeadAction(lead.id, { ...lead, stage: newStage as any })
+      await updateLeadAction(lead.id, {
+        name: lead.name,
+        email: lead.email || undefined,
+        phone: lead.phone || undefined,
+        source: lead.source || undefined,
+        stage: newStage as 'new' | 'contacted' | 'booked' | 'won' | 'lost',
+        notes: lead.notes || undefined,
+        next_follow_up_date: lead.next_follow_up_date || undefined,
+      })
       toast({ title: 'Stage updated' })
       router.refresh()
     } catch (error: any) {
