@@ -32,12 +32,20 @@ export function CRMContent({ leads }: CRMContentProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string
+    email: string
+    phone: string
+    source: string
+    stage: 'new' | 'contacted' | 'booked' | 'won' | 'lost'
+    notes: string
+    next_follow_up_date: string
+  }>({
     name: '',
     email: '',
     phone: '',
     source: '',
-    stage: 'new' as const,
+    stage: 'new',
     notes: '',
     next_follow_up_date: '',
   })
