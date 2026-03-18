@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'TutorLaunch - Grow Your Tutoring Business',
+  title: 'Solo Tutor Suite - Grow Your Tutoring Business',
   description: 'AI-powered platform to help tutors attract high-paying clients and manage their business professionally.',
 }
 

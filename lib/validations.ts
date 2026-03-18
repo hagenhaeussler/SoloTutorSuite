@@ -31,6 +31,9 @@ export type OnboardingInput = z.infer<typeof onboardingSchema>
 export const siteEditSchema = z.object({
   headline: z.string().max(200).optional(),
   bio: z.string().max(2000).optional(),
+  accent_color: z.string().regex(/^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/).optional().or(z.literal('')),
+  contact_email: z.string().email().optional().or(z.literal('')),
+  contact_phone: z.string().max(30).optional().or(z.literal('')),
   packages: z.array(z.object({
     name: z.string(),
     price: z.number().min(0),
@@ -60,7 +63,9 @@ export const bookingSchema = z.object({
   end_ts: z.string().datetime(),
   prospect_name: z.string().min(1, 'Enter your name'),
   prospect_email: z.string().email('Enter a valid email'),
+  parent_guardian_email: z.string().email('Enter a valid parent/guardian email').optional().or(z.literal('')),
   reason: z.string().max(500).optional(),
+  reminder_offset_minutes: z.number().min(1).max(1440).optional(),
 })
 
 export type BookingInput = z.infer<typeof bookingSchema>
@@ -78,13 +83,31 @@ export const leadSchema = z.object({
 
 export type LeadInput = z.infer<typeof leadSchema>
 
+export const studentStatusSchema = z.enum(['active', 'inactive', 'completed', 'lead'])
+
 // Student schema
 export const studentSchema = z.object({
   name: z.string().min(1, 'Enter student name'),
   email: z.string().email().optional().or(z.literal('')),
+  parent_contact: z.string().max(200, 'Parent contact is too long').optional().or(z.literal('')),
+  subject_exam_type: z.string().max(200, 'Subject / exam type is too long').optional().or(z.literal('')),
+  notes: z.string().max(5000, 'Notes are too long').optional().or(z.literal('')),
+  status: studentStatusSchema.default('active'),
 })
 
 export type StudentInput = z.infer<typeof studentSchema>
+
+export const updateStudentProfileSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1, 'Enter student name'),
+  email: z.string().email().optional().or(z.literal('')),
+  parent_contact: z.string().max(200, 'Parent contact is too long').optional().or(z.literal('')),
+  subject_exam_type: z.string().max(200, 'Subject / exam type is too long').optional().or(z.literal('')),
+  notes: z.string().max(5000, 'Notes are too long').optional().or(z.literal('')),
+  status: studentStatusSchema,
+})
+
+export type UpdateStudentProfileInput = z.infer<typeof updateStudentProfileSchema>
 
 // Homework schema
 export const homeworkSchema = z.object({
@@ -95,3 +118,60 @@ export const homeworkSchema = z.object({
 })
 
 export type HomeworkInput = z.infer<typeof homeworkSchema>
+
+// Zoom meeting link schema
+export const zoomMeetingLinkSchema = z
+  .string()
+  .url('Enter a valid URL')
+  .refine(
+    (value) => /^https?:\/\/([a-z0-9-]+\.)?zoom\.us\//i.test(value),
+    'Enter a valid Zoom meeting link'
+  )
+
+export const studentInviteCodeSchema = z
+  .string()
+  .trim()
+  .min(4, 'Student ID is too short')
+  .max(32, 'Student ID is too long')
+  .regex(/^[A-Z0-9-]+$/i, 'Student ID can only include letters, numbers, and dashes')
+
+export const chatMessageSchema = z.object({
+  message: z.string().trim().min(1, 'Message cannot be empty').max(2000, 'Message is too long'),
+})
+
+export const lessonNoteSchema = z.object({
+  student_id: z.string().uuid(),
+  booking_id: z.string().uuid().optional().or(z.literal('')),
+  lesson_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  title: z.string().min(1).max(200),
+  summary: z.string().max(5000).optional().or(z.literal('')),
+  homework_assigned: z.string().max(5000).optional().or(z.literal('')),
+  visibility_scope: z.enum(['private', 'student', 'shared']).default('student'),
+})
+
+export const progressMilestoneSchema = z.object({
+  student_id: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional().or(z.literal('')),
+  status: z.enum(['pending', 'in_progress', 'achieved']).default('pending'),
+  target_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
+  visible_to_student: z.boolean().default(true),
+})
+
+export const progressShareLinkSchema = z.object({
+  student_id: z.string().uuid(),
+  expires_in_days: z.number().int().min(1).max(365).optional(),
+})
+
+export const tutorInquirySchema = z.object({
+  tutor_slug: z.string().min(1),
+  name: z.string().min(1).max(120),
+  email: z.string().email(),
+  message: z.string().min(5).max(5000),
+  desired_start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
+})
+
+export type LessonNoteInput = z.infer<typeof lessonNoteSchema>
+export type ProgressMilestoneInput = z.infer<typeof progressMilestoneSchema>
+export type ProgressShareLinkInput = z.infer<typeof progressShareLinkSchema>
+export type TutorInquiryInput = z.infer<typeof tutorInquirySchema>

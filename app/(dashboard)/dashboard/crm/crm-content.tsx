@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,9 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/use-toast'
-import { Users, Plus, Loader2 } from 'lucide-react'
-import type { Lead } from '@/lib/types'
-import { addLeadAction, updateLeadAction, deleteLeadAction } from './actions'
+import { Users, Plus, Loader2, UserPlus, CheckCircle2 } from 'lucide-react'
+import type { Lead, Student } from '@/lib/types'
+import { addLeadAction, updateLeadAction, deleteLeadAction, addLeadToStudentsAction } from './actions'
 import { formatDate } from '@/lib/utils'
 
 const STAGES = [
@@ -26,12 +27,15 @@ const STAGES = [
 
 interface CRMContentProps {
   leads: Lead[]
+  students: Pick<Student, 'id' | 'name' | 'email' | 'created_at'>[]
 }
 
-export function CRMContent({ leads }: CRMContentProps) {
+export function CRMContent({ leads, students }: CRMContentProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingLead, setEditingLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(false)
+  const [addingLeadId, setAddingLeadId] = useState<string | null>(null)
+  const [recentlyConvertedLeadIds, setRecentlyConvertedLeadIds] = useState<string[]>([])
   const [formData, setFormData] = useState<{
     name: string
     email: string
@@ -136,6 +140,35 @@ export function CRMContent({ leads }: CRMContentProps) {
 
   const getStageColor = (stage: string) => {
     return STAGES.find(s => s.value === stage)?.color || 'bg-gray-100'
+  }
+
+  const isLeadAlreadyStudent = (lead: Lead) => {
+    if (recentlyConvertedLeadIds.includes(lead.id)) return true
+    if (!lead.email) return false
+    return students.some(student => student.email?.toLowerCase() === lead.email?.toLowerCase())
+  }
+
+  const handleAddToStudents = async (lead: Lead, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    setAddingLeadId(lead.id)
+    try {
+      const result = await addLeadToStudentsAction(lead.id)
+      if (result.error) throw new Error(result.error)
+
+      setRecentlyConvertedLeadIds(prev => [...prev, lead.id])
+
+      if (result.alreadyExists) {
+        toast({ title: 'Already in Students', description: 'This person is already in your Students Hub.' })
+      } else {
+        toast({ title: 'Added to Students!', description: `${lead.name} is now in your Students Hub.` })
+      }
+
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setAddingLeadId(null)
+    }
   }
 
   const leadsByStage = STAGES.reduce((acc, stage) => {
@@ -265,6 +298,39 @@ export function CRMContent({ leads }: CRMContentProps) {
         ))}
       </div>
 
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Students in Your Hub ({students.length})
+          </CardTitle>
+          <CardDescription>
+            Booked leads can be added directly to Students from the CRM cards below.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {students.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No students yet.</p>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-2">
+              {students.map((student) => (
+                <div key={student.id} className="p-3 bg-gray-50 rounded-lg border">
+                  <p className="font-medium">{student.name}</p>
+                  {student.email && (
+                    <p className="text-xs text-muted-foreground truncate">{student.email}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-4">
+            <Link href="/dashboard/students">
+              <Button variant="outline" size="sm">Open Students Hub</Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Pipeline Board */}
       <div className="grid grid-cols-5 gap-4">
         {STAGES.map(stage => (
@@ -293,6 +359,31 @@ export function CRMContent({ leads }: CRMContentProps) {
                       <p className="text-xs text-muted-foreground mt-2">
                         Follow up: {formatDate(lead.next_follow_up_date)}
                       </p>
+                    )}
+                    {(lead.stage === 'booked' || lead.stage === 'won') && (
+                      <div className="mt-3">
+                        {isLeadAlreadyStudent(lead) ? (
+                          <Button size="sm" variant="secondary" className="w-full" disabled>
+                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                            Added to Students
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                            onClick={(event) => handleAddToStudents(lead, event)}
+                            disabled={addingLeadId === lead.id}
+                          >
+                            {addingLeadId === lead.id ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <UserPlus className="w-4 h-4 mr-2" />
+                            )}
+                            Add to Students
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </CardContent>
                 </Card>

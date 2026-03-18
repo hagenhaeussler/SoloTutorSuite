@@ -9,7 +9,8 @@ import {
   Globe, 
   TrendingUp,
   CheckCircle,
-  ArrowRight
+  ArrowRight,
+  GraduationCap
 } from 'lucide-react'
 
 export default function LandingPage() {
@@ -22,7 +23,7 @@ export default function LandingPage() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl">TutorLaunch</span>
+            <span className="font-bold text-xl">Solo Tutor Suite</span>
           </div>
           <Link href="/login">
             <Button>Sign In</Button>
@@ -45,9 +46,15 @@ export default function LandingPage() {
           and a CRM—everything you need to attract high-paying students.
         </p>
         <div className="flex gap-4 justify-center">
-          <Link href="/login">
+          <Link href="/login?role=tutor">
             <Button size="lg" className="gap-2">
-              Get Started Free <ArrowRight className="w-4 h-4" />
+              I&apos;m a Tutor <ArrowRight className="w-4 h-4" />
+            </Button>
+          </Link>
+          <Link href="/login?role=student">
+            <Button size="lg" variant="outline" className="gap-2">
+              <GraduationCap className="w-4 h-4" />
+              I&apos;m a Student
             </Button>
           </Link>
         </div>
@@ -113,7 +120,13 @@ export default function LandingPage() {
             </p>
             <Link href="/login">
               <Button size="lg" variant="secondary" className="gap-2">
-                Sign In with Google <ArrowRight className="w-4 h-4" />
+                Continue as Tutor <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Link href="/login?role=student">
+              <Button size="lg" variant="outline" className="gap-2 mt-3">
+                <GraduationCap className="w-4 h-4" />
+                Continue as Student
               </Button>
             </Link>
           </CardContent>
@@ -123,7 +136,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="container mx-auto px-4 text-center text-gray-600">
-          <p>© 2024 TutorLaunch. Built to help tutors succeed.</p>
+          <p>© 2024 Solo Tutor Suite. Built to help tutors succeed.</p>
         </div>
       </footer>
     </div>

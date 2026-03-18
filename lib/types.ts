@@ -11,7 +11,10 @@ export interface Profile {
   email: string
   name: string | null
   avatar_url: string | null
+  role: 'tutor' | 'student'
+  student_invite_code: string | null
   timezone: string
+  reminder_minutes_before: number
   created_at: string
   updated_at: string
 }
@@ -51,6 +54,9 @@ export interface TutorSite {
   slug: string
   headline: string | null
   bio: string | null
+  accent_color: string | null
+  contact_email: string | null
+  contact_phone: string | null
   packages: Array<{
     name: string
     price: number
@@ -108,13 +114,34 @@ export interface AvailabilityRule {
 export interface Booking {
   id: string
   user_id: string
+  student_id: string | null
   start_ts: string
   end_ts: string
   prospect_name: string
   prospect_email: string
+  parent_guardian_email: string | null
   reason: string | null
+  reminder_offset_minutes: number
   status: 'confirmed' | 'cancelled'
   created_at: string
+}
+
+export interface BookingEmailEvent {
+  id: string
+  booking_id: string
+  user_id: string
+  recipient_email: string
+  recipient_role: 'student' | 'parent' | 'tutor'
+  email_kind: 'confirmation' | 'reminder'
+  reminder_offset_minutes: number | null
+  send_at: string
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled'
+  attempts: number
+  error_message: string | null
+  idempotency_key: string
+  sent_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Lead {
@@ -134,9 +161,26 @@ export interface Lead {
 export interface Student {
   id: string
   user_id: string
+  auth_user_id: string | null
   name: string
   email: string | null
+  parent_contact: string | null
+  subject_exam_type: string | null
+  notes: string | null
+  status: 'active' | 'inactive' | 'completed' | 'lead'
+  zoom_meeting_link: string | null
   access_token: string
+  created_at: string
+}
+
+export interface StudentChatMessage {
+  id: string
+  tutor_user_id: string
+  student_id: string
+  sender_type: 'tutor' | 'student'
+  sender_user_id: string | null
+  message: string
+  read_at: string | null
   created_at: string
 }
 
@@ -169,4 +213,88 @@ export interface HomeworkSubmission {
   storage_path: string
   filename: string
   submitted_at: string
+}
+
+export interface LessonNote {
+  id: string
+  user_id: string
+  student_id: string
+  booking_id: string | null
+  lesson_date: string
+  title: string
+  summary: string | null
+  homework_assigned: string | null
+  visibility_scope: 'private' | 'student' | 'shared'
+  created_at: string
+  updated_at: string
+}
+
+export interface ProgressMilestone {
+  id: string
+  user_id: string
+  student_id: string
+  title: string
+  description: string | null
+  status: 'pending' | 'in_progress' | 'achieved'
+  target_date: string | null
+  achieved_at: string | null
+  visible_to_student: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ProgressShareLink {
+  id: string
+  user_id: string
+  student_id: string
+  token: string
+  expires_at: string | null
+  revoked_at: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface RetentionEmailEvent {
+  id: string
+  user_id: string
+  student_id: string
+  recipient_email: string
+  template_kind: 'book_next_session' | 'course_end_followup' | 'reengagement'
+  inactivity_days: number | null
+  send_at: string
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled'
+  attempts: number
+  error_message: string | null
+  idempotency_key: string
+  sent_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TutorInquiry {
+  id: string
+  user_id: string
+  tutor_site_id: string | null
+  name: string
+  email: string
+  message: string
+  desired_start_date: string | null
+  status: 'new' | 'contacted' | 'archived'
+  created_at: string
+  updated_at: string
+}
+
+export interface Invoice {
+  id: string
+  user_id: string
+  student_id: string | null
+  booking_id: string | null
+  amount_cents: number
+  currency: string
+  status: 'pending' | 'paid' | 'void'
+  due_date: string | null
+  paid_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
 }

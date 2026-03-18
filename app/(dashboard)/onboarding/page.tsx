@@ -161,7 +161,7 @@ export default function OnboardingPage() {
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
-            <span className="font-bold text-2xl">TutorLaunch</span>
+            <span className="font-bold text-2xl">Solo Tutor Suite</span>
           </div>
           <h1 className="text-2xl font-bold">Let&apos;s set up your profile</h1>
           <p className="text-muted-foreground">This helps us create your personalized growth plan</p>

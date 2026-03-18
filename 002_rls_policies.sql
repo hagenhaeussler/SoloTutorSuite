@@ -1,4 +1,4 @@
--- TutorLaunch Row Level Security Policies
+-- Solo Tutor Suite Row Level Security Policies
 -- Run this AFTER 001_schema.sql
 
 -- Enable RLS on all tables

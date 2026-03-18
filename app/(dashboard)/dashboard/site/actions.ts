@@ -21,6 +21,9 @@ export async function updateSiteAction(data: SiteEditInput) {
       .update({
         headline: validated.headline,
         bio: validated.bio,
+        accent_color: validated.accent_color || null,
+        contact_email: validated.contact_email || null,
+        contact_phone: validated.contact_phone || null,
         packages: validated.packages,
         booking_link: validated.booking_link || null,
         published: validated.published,

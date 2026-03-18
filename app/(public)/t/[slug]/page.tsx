@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Sparkles, Calendar, CheckCircle } from 'lucide-react'
+import { InquiryForm } from './inquiry-form'
 
 export default async function TutorSitePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -36,19 +37,21 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
 
   const bookingUrl = site.booking_link || `/book/${slug}`
 
+  const accentColor = site.accent_color || undefined
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: accentColor }}>
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold">TutorLaunch</span>
+            <span className="font-bold">Solo Tutor Suite</span>
           </div>
           <Link href={bookingUrl}>
-            <Button>
+            <Button style={{ backgroundColor: accentColor }}>
               <Calendar className="w-4 h-4 mr-2" />
               Book a Call
             </Button>
@@ -79,7 +82,7 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
           </p>
           
           <Link href={bookingUrl}>
-            <Button size="lg" className="gap-2">
+            <Button size="lg" className="gap-2" style={{ backgroundColor: accentColor }}>
               <Calendar className="w-5 h-5" />
               Schedule Your Session
             </Button>
@@ -99,11 +102,11 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
                   <CardDescription>{pkg.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-primary mb-4">
+                  <div className="text-3xl font-bold mb-4" style={{ color: accentColor }}>
                     ${pkg.price}
                   </div>
                   <Link href={bookingUrl}>
-                    <Button className="w-full" variant={i === 1 ? 'default' : 'outline'}>
+                    <Button className="w-full" variant={i === 1 ? 'default' : 'outline'} style={i === 1 ? { backgroundColor: accentColor } : undefined}>
                       Get Started
                     </Button>
                   </Link>
@@ -121,7 +124,7 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <div className="text-center">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-6 h-6 text-primary" />
+                <CheckCircle className="w-6 h-6" style={{ color: accentColor }} />
               </div>
               <h3 className="font-semibold mb-2">Personalized Approach</h3>
               <p className="text-sm text-gray-600">
@@ -130,7 +133,7 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-6 h-6 text-primary" />
+                <CheckCircle className="w-6 h-6" style={{ color: accentColor }} />
               </div>
               <h3 className="font-semibold mb-2">Flexible Scheduling</h3>
               <p className="text-sm text-gray-600">
@@ -139,7 +142,7 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-6 h-6 text-primary" />
+                <CheckCircle className="w-6 h-6" style={{ color: accentColor }} />
               </div>
               <h3 className="font-semibold mb-2">Proven Results</h3>
               <p className="text-sm text-gray-600">
@@ -157,17 +160,32 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
           Book a free consultation to discuss your goals
         </p>
         <Link href={bookingUrl}>
-          <Button size="lg">
+          <Button size="lg" style={{ backgroundColor: accentColor }}>
             <Calendar className="w-5 h-5 mr-2" />
             Book Your Call
           </Button>
         </Link>
       </section>
 
+      <section className="container mx-auto px-4 pb-16 max-w-3xl">
+        {(site.contact_email || site.contact_phone) && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Contact Details</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground space-y-1">
+              {site.contact_email && <p>Email: {site.contact_email}</p>}
+              {site.contact_phone && <p>Phone: {site.contact_phone}</p>}
+            </CardContent>
+          </Card>
+        )}
+        <InquiryForm slug={slug} accentColor={accentColor} />
+      </section>
+
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="container mx-auto px-4 text-center text-gray-600 text-sm">
-          <p>Powered by TutorLaunch</p>
+          <p>Powered by Solo Tutor Suite</p>
         </div>
       </footer>
     </div>

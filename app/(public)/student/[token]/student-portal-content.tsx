@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
-import { GraduationCap, FileText, ClipboardList, Download, Upload, Loader2, Check } from 'lucide-react'
+import { GraduationCap, FileText, ClipboardList, Download, Upload, Loader2, Check, Video } from 'lucide-react'
 import type { Student, StudentFile, Homework, HomeworkSubmission } from '@/lib/types'
 import { downloadFileAction, uploadFileAction, submitHomeworkAction } from './actions'
 import { formatDate } from '@/lib/utils'
@@ -98,6 +98,25 @@ export function StudentPortalContent({
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-3xl mx-auto">
+          {student.zoom_meeting_link && (
+            <Card className="mb-6 border-primary/20 bg-primary/5">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="font-medium">Live lesson available</p>
+                    <p className="text-sm text-muted-foreground">Join your Zoom meeting with {tutorName}</p>
+                  </div>
+                  <Button asChild>
+                    <a href={student.zoom_meeting_link} target="_blank" rel="noopener noreferrer">
+                      <Video className="w-4 h-4 mr-2" />
+                      Join Zoom Call
+                    </a>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <input
             type="file"
             ref={fileInputRef}

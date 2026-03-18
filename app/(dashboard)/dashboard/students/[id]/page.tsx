@@ -39,12 +39,45 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     .select('*')
     .eq('student_id', id)
 
+  // Get chat messages
+  const { data: chatMessages } = await supabase
+    .from('student_chat_messages')
+    .select('*')
+    .eq('student_id', id)
+    .eq('tutor_user_id', user.id)
+    .order('created_at', { ascending: true })
+
+  const { data: lessonNotes } = await supabase
+    .from('lesson_notes')
+    .select('*')
+    .eq('student_id', id)
+    .eq('user_id', user.id)
+    .order('lesson_date', { ascending: false })
+
+  const { data: milestones } = await supabase
+    .from('progress_milestones')
+    .select('*')
+    .eq('student_id', id)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
+  const { data: shareLinks } = await supabase
+    .from('progress_share_links')
+    .select('*')
+    .eq('student_id', id)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
   return (
     <StudentDetailContent 
       student={student}
       files={files || []}
       homework={homework || []}
       submissions={submissions || []}
+      chatMessages={chatMessages || []}
+      lessonNotes={lessonNotes || []}
+      milestones={milestones || []}
+      shareLinks={shareLinks || []}
     />
   )
 }

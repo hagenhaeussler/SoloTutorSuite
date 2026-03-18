@@ -91,3 +91,64 @@ export async function deleteLeadAction(id: string) {
     return { error: error.message || 'Failed to delete lead' }
   }
 }
+
+export async function addLeadToStudentsAction(leadId: string) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { error: 'Not authenticated' }
+    }
+
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('id, user_id, name, email, stage')
+      .eq('id', leadId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (leadError || !lead) {
+      return { error: 'Lead not found' }
+    }
+
+    if (lead.email) {
+      const { data: existingStudent } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('email', lead.email)
+        .maybeSingle()
+
+      if (existingStudent) {
+        return { success: true, alreadyExists: true }
+      }
+    }
+
+    const { error: insertError } = await supabase.from('students').insert({
+      user_id: user.id,
+      name: lead.name,
+      email: lead.email || null,
+    })
+
+    if (insertError) throw insertError
+
+    // Mark lead as won once converted to a student.
+    const { error: updateError } = await supabase
+      .from('leads')
+      .update({ stage: 'won' })
+      .eq('id', leadId)
+      .eq('user_id', user.id)
+
+    if (updateError) {
+      console.error('Failed to update lead stage after student conversion:', updateError)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error converting lead to student:', error)
+    return { error: error.message || 'Failed to add lead to students' }
+  }
+}

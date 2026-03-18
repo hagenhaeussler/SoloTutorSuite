@@ -26,6 +26,7 @@ export function BookingContent({ slug, tutorName, tutorId, rules, existingBookin
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [parentGuardianEmail, setParentGuardianEmail] = useState('')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
   const [booked, setBooked] = useState(false)
@@ -123,6 +124,7 @@ export function BookingContent({ slug, tutorName, tutorId, rules, existingBookin
         end_ts: endDate.toISOString(),
         prospect_name: name,
         prospect_email: email,
+        parent_guardian_email: parentGuardianEmail,
         reason,
       })
 
@@ -200,7 +202,7 @@ export function BookingContent({ slug, tutorName, tutorId, rules, existingBookin
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold">TutorLaunch</span>
+            <span className="font-bold">Solo Tutor Suite</span>
           </div>
         </div>
       </header>
@@ -318,6 +320,15 @@ export function BookingContent({ slug, tutorName, tutorId, rules, existingBookin
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="your@email.com"
+                    />
+                  </div>
+                  <div>
+                    <Label>Parent/Guardian Email (optional)</Label>
+                    <Input
+                      type="email"
+                      value={parentGuardianEmail}
+                      onChange={(e) => setParentGuardianEmail(e.target.value)}
+                      placeholder="parent@email.com"
                     />
                   </div>
                   <div>

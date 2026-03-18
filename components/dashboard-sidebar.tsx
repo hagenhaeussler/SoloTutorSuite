@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   Sparkles,
   TrendingUp,
+  BarChart3,
   FileText,
   Globe,
   Calendar,
@@ -23,8 +24,9 @@ import type { Profile } from '@/lib/types'
 
 const navItems = [
   { href: '/dashboard', label: 'Growth Plan', icon: TrendingUp },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/assets', label: 'Assets', icon: FileText },
-  { href: '/dashboard/site', label: 'Mini-Site', icon: Globe },
+  { href: '/dashboard/site', label: 'Edit My Website', icon: Globe },
   { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
   { href: '/dashboard/crm', label: 'CRM', icon: Users },
   { href: '/dashboard/students', label: 'Students', icon: GraduationCap },
@@ -54,7 +56,7 @@ export function DashboardSidebar({ user, profile, slug }: DashboardSidebarProps)
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-lg">TutorLaunch</span>
+          <span className="font-bold text-lg">Solo Tutor Suite</span>
         </Link>
       </div>
 
@@ -94,7 +96,7 @@ export function DashboardSidebar({ user, profile, slug }: DashboardSidebarProps)
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
               >
                 <Globe className="w-5 h-5" />
-                Mini-Site
+                View My Website
                 <ExternalLink className="w-3 h-3 ml-auto" />
               </a>
               <a

@@ -2,6 +2,7 @@
 
 import { createServiceClient } from '@/lib/supabase/server'
 import { bookingSchema, type BookingInput } from '@/lib/validations'
+import { queueBookingEmailsAndSendConfirmations } from '@/lib/booking-emails'
 
 export async function createBookingAction(data: BookingInput) {
   try {
@@ -21,20 +22,70 @@ export async function createBookingAction(data: BookingInput) {
       return { error: 'Tutor not found' }
     }
 
+    // Get tutor profile for tutor email + reminder preference
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name, email, reminder_minutes_before')
+      .eq('id', site.user_id)
+      .single()
+
+    if (!profile?.email) {
+      return { error: 'Tutor email is not configured. Ask the tutor to update their profile email.' }
+    }
+
+    const reminderOffset = validated.reminder_offset_minutes || profile.reminder_minutes_before || 10
+
+    // Try to link booking to an existing student by email when the match is unambiguous.
+    let linkedStudentId: string | null = null
+    const normalizedProspectEmail = validated.prospect_email.trim()
+    if (normalizedProspectEmail) {
+      const { data: studentMatches } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', site.user_id)
+        .ilike('email', normalizedProspectEmail)
+        .limit(2)
+
+      if ((studentMatches || []).length === 1) {
+        linkedStudentId = studentMatches![0].id
+      }
+    }
+
     // Create booking
-    const { error: bookingError } = await supabase
+    const { data: booking, error: bookingError } = await supabase
       .from('bookings')
       .insert({
         user_id: site.user_id,
+        student_id: linkedStudentId,
         start_ts: validated.start_ts,
         end_ts: validated.end_ts,
         prospect_name: validated.prospect_name,
         prospect_email: validated.prospect_email,
+        parent_guardian_email: validated.parent_guardian_email || null,
         reason: validated.reason || null,
+        reminder_offset_minutes: reminderOffset,
         status: 'confirmed',
       })
+      .select('id, user_id, student_id, start_ts, prospect_name, prospect_email, parent_guardian_email, reminder_offset_minutes')
+      .single()
 
     if (bookingError) throw bookingError
+
+    // Send confirmation emails now and queue reminders.
+    await queueBookingEmailsAndSendConfirmations({
+      supabase,
+      context: {
+        bookingId: booking.id,
+        userId: booking.user_id,
+        tutorName: profile.name || 'Tutor',
+        tutorEmail: profile.email,
+        studentName: booking.prospect_name,
+        studentEmail: booking.prospect_email,
+        parentGuardianEmail: booking.parent_guardian_email,
+        lessonStartTs: booking.start_ts,
+        reminderOffsetMinutes: booking.reminder_offset_minutes || reminderOffset,
+      },
+    })
 
     // Auto-create CRM lead
     const { error: leadError } = await supabase

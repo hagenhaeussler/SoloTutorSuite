@@ -1,315 +1,86 @@
-# TutorLaunch - Professional Tutoring Platform
-
-A complete SaaS platform that helps self-employed tutors look professional and grow their business with AI-powered marketing tools.
-
-## Features
-
-- 🔐 **Google OAuth Authentication** via Supabase
-- 📝 **Onboarding Flow** - Collect tutor details, subjects, pricing
-- 🤖 **AI Growth Plan** - Generate personalized marketing strategies
-- ✍️ **AI Marketing Assets** - Landing page copy, ads, outreach scripts
-- 🌐 **Public Mini-Site** - Professional tutor profile at `/t/{slug}`
-- 📅 **Calendar & Booking** - Set availability, accept bookings
-- 👥 **CRM Pipeline** - Track leads through stages
-- 📚 **Student Hub** - Files, homework, submissions
-
-## Tech Stack
-
-- Next.js 14+ (App Router)
-- TypeScript
-- Tailwind CSS + shadcn/ui
-- Supabase (Postgres, Auth, Storage)
-- OpenAI API
-- Zod validation
-
----
-
-## 🚀 Deploy Today (Step-by-Step)
-
-### 1. Create Supabase Project
-
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Note your project URL and anon key from Settings > API
-
-### 2. Run Database Migrations
-
-In Supabase SQL Editor, run the files in this order:
-
-1. `supabase/migrations/001_schema.sql` - Creates all tables
-2. `supabase/migrations/002_rls_policies.sql` - Sets up Row Level Security
-
-### 3. Set Up Storage Buckets
-
-In Supabase Storage:
-
-1. Create a bucket called `student-files` (private)
-2. Run `supabase/migrations/003_storage_policies.sql` in SQL Editor
-
-### 4. Enable Google OAuth
-
-1. Go to Supabase > Authentication > Providers > Google
-2. Enable Google provider
-3. Create OAuth credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
-   - Create OAuth 2.0 Client ID (Web application)
-   - Authorized redirect URI: `https://YOUR_PROJECT.supabase.co/auth/v1/callback`
-4. Copy Client ID and Secret to Supabase Google provider settings
-
-### 5. Configure Auth Redirect URLs
-
-In Supabase > Authentication > URL Configuration:
-
-- Site URL: `https://your-vercel-app.vercel.app`
-- Redirect URLs: 
-  - `https://your-vercel-app.vercel.app/auth/callback`
-  - `http://localhost:3000/auth/callback` (for local dev)
-
-### 6. Deploy to Vercel
-
-1. Push this repo to GitHub
-2. Import to [Vercel](https://vercel.com)
-3. Add Environment Variables:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-OPENAI_API_KEY=your-openai-api-key
-NEXT_PUBLIC_APP_URL=https://your-vercel-app.vercel.app
-```
-
-4. Deploy!
-
----
-
-## 🛠 Local Development
-
-### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
-- Supabase project (for database)
-
-### Setup
-
-```bash
-# Install dependencies
-npm install
-
-# Copy environment file
-cp .env.example .env.local
-
-# Fill in your environment variables in .env.local
-
-# Run development server
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000)
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
-| `OPENAI_API_KEY` | OpenAI API key for AI features |
-| `NEXT_PUBLIC_APP_URL` | Your app's public URL |
-
----
-
-## Project Structure
-
-```
-├── app/
-│   ├── (auth)/           # Auth pages (login)
-│   ├── (dashboard)/      # Protected dashboard pages
-│   ├── (public)/         # Public pages (mini-site, booking)
-│   ├── api/              # API routes
-│   └── auth/callback/    # OAuth callback handler
-├── components/           # React components
-├── lib/                  # Utilities, Supabase client, types
-├── supabase/
-│   └── migrations/       # SQL migration files
-└── public/               # Static assets
-```
-
----
-
-## Testing the App
-
-1. ✅ Sign in with Google
-2. ✅ Complete onboarding form
-3. ✅ Generate AI growth plan
-4. ✅ Generate marketing assets
-5. ✅ Publish mini-site, visit `/t/{your-slug}`
-6. ✅ Set availability, book via `/book/{your-slug}`
-7. ✅ Check booking appears in CRM
-8. ✅ Create student, share access link
-9. ✅ Upload files, create homework, submit as student
-
----
-
-## License
-
-MIT
-
-# TutorLaunch - Professional Tutoring Platform
-
-A complete SaaS platform that helps self-employed tutors look professional and grow their business with AI-powered marketing tools.
-
-## Features
-
-- 🔐 **Google OAuth Authentication** via Supabase
-- 📝 **Onboarding Flow** - Collect tutor details, subjects, pricing
-- 🤖 **AI Growth Plan** - Generate personalized marketing strategies
-- ✍️ **AI Marketing Assets** - Landing page copy, ads, outreach scripts
-- 🌐 **Public Mini-Site** - Professional tutor profile at `/t/{slug}`
-- 📅 **Calendar & Booking** - Set availability, accept bookings
-- 👥 **CRM Pipeline** - Track leads through stages
-- 📚 **Student Hub** - Files, homework, submissions
-
-## Tech Stack
-
-- Next.js 14+ (App Router)
-- TypeScript
-- Tailwind CSS + shadcn/ui
-- Supabase (Postgres, Auth, Storage)
-- OpenAI API
-- Zod validation
-
----
-
-## 🚀 Deploy Today (Step-by-Step)
-
-### 1. Create Supabase Project
-
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Note your project URL and anon key from Settings > API
-
-### 2. Run Database Migrations
-
-In Supabase SQL Editor, run the files in this order:
-
-1. `supabase/migrations/001_schema.sql` - Creates all tables
-2. `supabase/migrations/002_rls_policies.sql` - Sets up Row Level Security
-
-### 3. Set Up Storage Buckets
-
-In Supabase Storage:
-
-1. Create a bucket called `student-files` (private)
-2. Run `supabase/migrations/003_storage_policies.sql` in SQL Editor
-
-### 4. Enable Google OAuth
-
-1. Go to Supabase > Authentication > Providers > Google
-2. Enable Google provider
-3. Create OAuth credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
-   - Create OAuth 2.0 Client ID (Web application)
-   - Authorized redirect URI: `https://YOUR_PROJECT.supabase.co/auth/v1/callback`
-4. Copy Client ID and Secret to Supabase Google provider settings
-
-### 5. Configure Auth Redirect URLs
-
-In Supabase > Authentication > URL Configuration:
-
-- Site URL: `https://your-vercel-app.vercel.app`
-- Redirect URLs: 
-  - `https://your-vercel-app.vercel.app/auth/callback`
-  - `http://localhost:3000/auth/callback` (for local dev)
-
-### 6. Deploy to Vercel
-
-1. Push this repo to GitHub
-2. Import to [Vercel](https://vercel.com)
-3. Add Environment Variables:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-OPENAI_API_KEY=your-openai-api-key
-NEXT_PUBLIC_APP_URL=https://your-vercel-app.vercel.app
-```
-
-4. Deploy!
-
----
-
-## 🛠 Local Development
-
-### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
-- Supabase project (for database)
-
-### Setup
-
-```bash
-# Install dependencies
-npm install
-
-# Copy environment file
-cp .env.example .env.local
-
-# Fill in your environment variables in .env.local
-
-# Run development server
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000)
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
-| `OPENAI_API_KEY` | OpenAI API key for AI features |
-| `NEXT_PUBLIC_APP_URL` | Your app's public URL |
-
----
-
-## Project Structure
-
-```
-├── app/
-│   ├── (auth)/           # Auth pages (login)
-│   ├── (dashboard)/      # Protected dashboard pages
-│   ├── (public)/         # Public pages (mini-site, booking)
-│   ├── api/              # API routes
-│   └── auth/callback/    # OAuth callback handler
-├── components/           # React components
-├── lib/                  # Utilities, Supabase client, types
-├── supabase/
-│   └── migrations/       # SQL migration files
-└── public/               # Static assets
-```
-
----
-
-## Testing the App
-
-1. ✅ Sign in with Google
-2. ✅ Complete onboarding form
-3. ✅ Generate AI growth plan
-4. ✅ Generate marketing assets
-5. ✅ Publish mini-site, visit `/t/{your-slug}`
-6. ✅ Set availability, book via `/book/{your-slug}`
-7. ✅ Check booking appears in CRM
-8. ✅ Create student, share access link
-9. ✅ Upload files, create homework, submit as student
-
----
-
-## License
-
-MIT
+# Solo Tutor Suite
+
+Solo Tutor Suite is a Next.js + Supabase tutoring platform for independent tutors to manage marketing, bookings, CRM, and student workflows.
+
+## What it does
+
+- Tutor onboarding and AI-generated growth plan/assets
+- Public tutor profile site and booking flow
+- Availability rules and calendar management
+- CRM lead pipeline
+- Student hub (files, homework, submissions)
+- Student mode with tutor linking via Student ID
+- Tutor↔student in-app chat
+- Transactional booking emails (confirmation + reminder queue)
+- Shareable parent/student progress summaries
+- Retention follow-up automations (cron + templates)
+- Analytics dashboard (revenue, repeat rate, churn, outstanding)
+- Tutor mini-site contact/request form
+
+## Architecture (concise)
+
+- **Frontend:** Next.js App Router + TypeScript + Tailwind + shadcn/ui
+- **Backend:** Supabase Postgres + Auth + RLS + Storage
+- **Server logic:** Next.js Server Actions in route-local `actions.ts` files
+- **AI:** OpenAI API (`lib/openai.ts`)
+- **Email:** Resend-style transactional integration (`lib/email.ts`, `lib/booking-emails.ts`)
+- **Scheduling:** Vercel cron endpoint at `/api/cron/booking-reminders`
+
+## Feature status matrix
+
+| Area | Status | Notes |
+| --- | --- | --- |
+| Tutor auth & onboarding | ✅ Implemented | Google OAuth + onboarding flow |
+| Public tutor mini-site | ✅ Implemented | `/t/[slug]` |
+| Booking flow | ✅ Implemented | `/book/[slug]`, slot generation, booking creation |
+| Booking reminders (email) | ✅ Implemented | Queue + cron processor + cancellation/reschedule handling |
+| Booking → Student direct linkage (`bookings.student_id`) | ✅ Implemented | Migration + unambiguous email backfill + create-time link attempt |
+| Availability calendar | ✅ Implemented | Availability rules + reminder preference management |
+| CRM pipeline | ✅ Implemented | Lead stages + conversion to students |
+| Students hub base workflows | ✅ Implemented | Add/manage students, files, homework, submissions |
+| Student profile fields (parent contact, subject/exam, notes, status) | ✅ Implemented | Schema + validations + actions + list visibility |
+| Student search/filter in hub | ✅ Implemented | Search + status filtering in Students Hub |
+| Parent/student progress sharing | ✅ Implemented | `/progress/[token]` + student app progress tab |
+| Retention/re-engagement automation | ✅ Implemented | `/api/cron/retention-followups` queue + sender |
+| Basic analytics dashboard | ✅ Implemented | `/dashboard/analytics` |
+| Tutor-site contact/request form | ✅ Implemented | Public mini-site inquiry capture to CRM |
+| Lesson lifecycle states beyond confirmed/cancelled | ⏳ Partial | Confirmed/cancelled exists; richer lesson-state workflow pending |
+| Multi-channel reminders (SMS/WhatsApp) | ❌ Not implemented | Current scope is email-only |
+
+## Database migrations
+
+Run in order from `supabase/migrations/`:
+
+1. `001_schema.sql`
+2. `002_rls_policies.sql`
+3. `003_storage_policies.sql`
+4. `004_students_zoom_link.sql`
+5. `005_booking_transactional_emails.sql`
+6. `006_student_mode_and_chat.sql`
+7. `007_student_profiles_and_booking_link.sql`
+8. `008_progress_retention_analytics.sql`
+
+## Environment variables
+
+Copy `.env.example` to `.env.local` and fill:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
+- `RESEND_API_KEY`
+- `EMAIL_FROM_ADDRESS`
+- `CRON_SECRET` (recommended)
+- `NEXT_PUBLIC_APP_URL`
+
+## Local development
+
+- Install dependencies: `npm install`
+- Start app: `npm run dev`
+- Open `http://localhost:3000`
+
+## Deployment notes
+
+- Configure Supabase OAuth redirect URLs to include `/auth/callback`
+- Configure Vercel env vars from `.env.example`
+- `vercel.json` contains cron schedule for booking reminders

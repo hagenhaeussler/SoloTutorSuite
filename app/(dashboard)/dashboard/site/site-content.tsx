@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
-import { Globe, ExternalLink, Save, Loader2, Plus, X, Eye } from 'lucide-react'
+import { Globe, ExternalLink, Save, Loader2, Plus, X } from 'lucide-react'
 import type { TutorSite } from '@/lib/types'
 import { updateSiteAction } from './actions'
 
@@ -23,6 +23,9 @@ export function SiteContent({ site, tutorName, subjects }: SiteContentProps) {
   const [loading, setLoading] = useState(false)
   const [headline, setHeadline] = useState(site?.headline || '')
   const [bio, setBio] = useState(site?.bio || '')
+  const [accentColor, setAccentColor] = useState(site?.accent_color || '#2563eb')
+  const [contactEmail, setContactEmail] = useState(site?.contact_email || '')
+  const [contactPhone, setContactPhone] = useState(site?.contact_phone || '')
   const [packages, setPackages] = useState<Array<{ name: string; price: number; description?: string }>>(
     site?.packages || []
   )
@@ -51,6 +54,9 @@ export function SiteContent({ site, tutorName, subjects }: SiteContentProps) {
       const result = await updateSiteAction({
         headline,
         bio,
+        accent_color: accentColor,
+        contact_email: contactEmail,
+        contact_phone: contactPhone,
         packages,
         booking_link: bookingLink,
         published: publish ? true : published,
@@ -90,14 +96,6 @@ export function SiteContent({ site, tutorName, subjects }: SiteContentProps) {
           </p>
         </div>
         <div className="flex gap-2">
-          {siteUrl && (
-            <a href={`/t/${site?.slug}`} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline">
-                <Eye className="w-4 h-4 mr-2" />
-                Preview
-              </Button>
-            </a>
-          )}
           <Button onClick={() => handleSave()} disabled={loading}>
             {loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -170,6 +168,34 @@ export function SiteContent({ site, tutorName, subjects }: SiteContentProps) {
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
               />
+            </div>
+            <div className="grid md:grid-cols-3 gap-3">
+              <div>
+                <Label>Accent Color</Label>
+                <Input
+                  type="color"
+                  value={accentColor}
+                  onChange={(e) => setAccentColor(e.target.value)}
+                  className="h-10 p-1"
+                />
+              </div>
+              <div>
+                <Label>Contact Email</Label>
+                <Input
+                  type="email"
+                  placeholder="contact@yourdomain.com"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>Contact Phone</Label>
+                <Input
+                  placeholder="+1 555 123 4567"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -28,6 +28,10 @@ export default async function DashboardLayout({
     .eq('id', user.id)
     .single()
 
+  if (profile?.role === 'student') {
+    redirect('/student/app')
+  }
+
   // Get site for slug
   const { data: site } = await supabase
     .from('tutor_site')

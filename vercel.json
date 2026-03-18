@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/booking-reminders",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/retention-followups",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}

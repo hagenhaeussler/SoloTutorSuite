@@ -12,9 +12,9 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeft, Copy, Upload, FileText, ClipboardList, Loader2, Plus, Trash2, Download, Check } from 'lucide-react'
-import type { Student, StudentFile, Homework, HomeworkSubmission } from '@/lib/types'
-import { uploadFileAction, deleteFileAction, getSignedUrlAction, addHomeworkAction, deleteHomeworkAction, deleteStudentAction } from '../actions'
+import { ArrowLeft, Copy, Upload, FileText, ClipboardList, Loader2, Plus, Trash2, Download, Check, Video, Save, MessageSquare, Send, BarChart3, Link2 } from 'lucide-react'
+import type { Student, StudentFile, Homework, HomeworkSubmission, StudentChatMessage, LessonNote, ProgressMilestone, ProgressShareLink } from '@/lib/types'
+import { uploadFileAction, deleteFileAction, getSignedUrlAction, addHomeworkAction, deleteHomeworkAction, deleteStudentAction, updateStudentZoomLinkAction, sendTutorChatMessageAction, addLessonNoteAction, addProgressMilestoneAction, createProgressShareLinkAction, revokeProgressShareLinkAction } from '../actions'
 import { formatDate } from '@/lib/utils'
 
 interface StudentDetailContentProps {
@@ -22,15 +22,33 @@ interface StudentDetailContentProps {
   files: StudentFile[]
   homework: Homework[]
   submissions: HomeworkSubmission[]
+  chatMessages: StudentChatMessage[]
+  lessonNotes: LessonNote[]
+  milestones: ProgressMilestone[]
+  shareLinks: ProgressShareLink[]
 }
 
-export function StudentDetailContent({ student, files, homework, submissions }: StudentDetailContentProps) {
+export function StudentDetailContent({ student, files, homework, submissions, chatMessages, lessonNotes, milestones, shareLinks }: StudentDetailContentProps) {
   const [uploading, setUploading] = useState(false)
   const [hwDialogOpen, setHwDialogOpen] = useState(false)
   const [hwLoading, setHwLoading] = useState(false)
+  const [zoomSaving, setZoomSaving] = useState(false)
+  const [chatSending, setChatSending] = useState(false)
+  const [progressLoading, setProgressLoading] = useState(false)
+  const [milestoneLoading, setMilestoneLoading] = useState(false)
+  const [shareLoading, setShareLoading] = useState(false)
   const [hwTitle, setHwTitle] = useState('')
   const [hwInstructions, setHwInstructions] = useState('')
   const [hwDueDate, setHwDueDate] = useState('')
+  const [zoomMeetingLink, setZoomMeetingLink] = useState(student.zoom_meeting_link || '')
+  const [chatText, setChatText] = useState('')
+  const [noteTitle, setNoteTitle] = useState('')
+  const [noteSummary, setNoteSummary] = useState('')
+  const [noteHomework, setNoteHomework] = useState('')
+  const [noteDate, setNoteDate] = useState(new Date().toISOString().split('T')[0])
+  const [milestoneTitle, setMilestoneTitle] = useState('')
+  const [milestoneDescription, setMilestoneDescription] = useState('')
+  const [milestoneTargetDate, setMilestoneTargetDate] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const router = useRouter()
@@ -134,6 +152,20 @@ export function StudentDetailContent({ student, files, homework, submissions }: 
     }
   }
 
+  const handleSaveZoomLink = async () => {
+    setZoomSaving(true)
+    try {
+      const result = await updateStudentZoomLinkAction(student.id, zoomMeetingLink)
+      if (result.error) throw new Error(result.error)
+      toast({ title: 'Video call link saved' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setZoomSaving(false)
+    }
+  }
+
   const getSubmissionForHomework = (homeworkId: string) => {
     return submissions.find(s => s.homework_id === homeworkId)
   }
@@ -141,6 +173,112 @@ export function StudentDetailContent({ student, files, homework, submissions }: 
   const downloadSubmission = async (storagePath: string) => {
     const result = await getSignedUrlAction(storagePath)
     if (result.url) window.open(result.url, '_blank')
+  }
+
+  const handleSendMessage = async () => {
+    if (!chatText.trim()) return
+    setChatSending(true)
+    try {
+      const result = await sendTutorChatMessageAction(student.id, chatText)
+      if (result.error) throw new Error(result.error)
+      setChatText('')
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setChatSending(false)
+    }
+  }
+
+  const handleAddLessonNote = async () => {
+    if (!noteTitle.trim()) {
+      toast({ title: 'Lesson note title is required', variant: 'destructive' })
+      return
+    }
+
+    setProgressLoading(true)
+    try {
+      const result = await addLessonNoteAction({
+        student_id: student.id,
+        lesson_date: noteDate,
+        title: noteTitle,
+        summary: noteSummary,
+        homework_assigned: noteHomework,
+        visibility_scope: 'shared',
+      })
+      if (result.error) throw new Error(result.error)
+
+      setNoteTitle('')
+      setNoteSummary('')
+      setNoteHomework('')
+      toast({ title: 'Lesson note added' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setProgressLoading(false)
+    }
+  }
+
+  const handleAddMilestone = async () => {
+    if (!milestoneTitle.trim()) {
+      toast({ title: 'Milestone title is required', variant: 'destructive' })
+      return
+    }
+
+    setMilestoneLoading(true)
+    try {
+      const result = await addProgressMilestoneAction({
+        student_id: student.id,
+        title: milestoneTitle,
+        description: milestoneDescription,
+        target_date: milestoneTargetDate,
+        status: 'pending',
+        visible_to_student: true,
+      })
+      if (result.error) throw new Error(result.error)
+
+      setMilestoneTitle('')
+      setMilestoneDescription('')
+      setMilestoneTargetDate('')
+      toast({ title: 'Milestone added' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setMilestoneLoading(false)
+    }
+  }
+
+  const handleCreateShareLink = async () => {
+    setShareLoading(true)
+    try {
+      const result = await createProgressShareLinkAction({
+        student_id: student.id,
+        expires_in_days: 60,
+      })
+      if (result.error) throw new Error(result.error)
+
+      const url = `${window.location.origin}/progress/${result.token}`
+      await navigator.clipboard.writeText(url)
+      toast({ title: 'Share link created and copied!' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setShareLoading(false)
+    }
+  }
+
+  const handleRevokeShareLink = async (linkId: string) => {
+    try {
+      const result = await revokeProgressShareLinkAction(linkId)
+      if (result.error) throw new Error(result.error)
+      toast({ title: 'Share link revoked' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    }
   }
 
   return (
@@ -179,6 +317,46 @@ export function StudentDetailContent({ student, files, homework, submissions }: 
         </CardContent>
       </Card>
 
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Video className="w-5 h-5" />
+            Video Call (Zoom)
+          </CardTitle>
+          <CardDescription>
+            Add a Zoom meeting link so both you and the student can join from inside the app.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-2">
+            <Input
+              value={zoomMeetingLink}
+              onChange={(e) => setZoomMeetingLink(e.target.value)}
+              placeholder="https://zoom.us/j/1234567890"
+            />
+            <Button onClick={handleSaveZoomLink} disabled={zoomSaving}>
+              {zoomSaving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Save Link
+            </Button>
+            {student.zoom_meeting_link && (
+              <Button variant="outline" asChild>
+                <a href={student.zoom_meeting_link} target="_blank" rel="noopener noreferrer">
+                  <Video className="w-4 h-4 mr-2" />
+                  Join Zoom
+                </a>
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Leave blank and save to remove the Zoom link.
+          </p>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="files">
         <TabsList className="mb-6">
           <TabsTrigger value="files" className="gap-2">
@@ -188,6 +366,14 @@ export function StudentDetailContent({ student, files, homework, submissions }: 
           <TabsTrigger value="homework" className="gap-2">
             <ClipboardList className="w-4 h-4" />
             Homework ({homework.length})
+          </TabsTrigger>
+          <TabsTrigger value="chat" className="gap-2">
+            <MessageSquare className="w-4 h-4" />
+            Chat
+          </TabsTrigger>
+          <TabsTrigger value="progress" className="gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Progress
           </TabsTrigger>
         </TabsList>
 
@@ -330,6 +516,191 @@ export function StudentDetailContent({ student, files, homework, submissions }: 
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="chat">
+          <Card>
+            <CardHeader>
+              <CardTitle>Chat with Student</CardTitle>
+              <CardDescription>Send messages directly inside Solo Tutor Suite.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-[420px] overflow-y-auto mb-4">
+                {chatMessages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No messages yet. Start the conversation below.</p>
+                ) : (
+                  chatMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.sender_type === 'tutor' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                          message.sender_type === 'tutor'
+                            ? 'bg-primary text-white'
+                            : 'bg-gray-100 text-gray-900'
+                        }`}
+                      >
+                        <p>{message.message}</p>
+                        <p className={`text-[10px] mt-1 ${message.sender_type === 'tutor' ? 'text-blue-100' : 'text-muted-foreground'}`}>
+                          {formatDate(message.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  value={chatText}
+                  onChange={(e) => setChatText(e.target.value)}
+                  placeholder="Type a message..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                  }}
+                />
+                <Button onClick={handleSendMessage} disabled={chatSending || !chatText.trim()}>
+                  {chatSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="progress">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="w-5 h-5" />
+                  Shareable Progress Summary
+                </CardTitle>
+                <CardDescription>
+                  Create a secure link for parents/students to view lessons, notes, homework, and milestones.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={handleCreateShareLink} disabled={shareLoading}>
+                  {shareLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Create & Copy Share Link
+                </Button>
+                <div className="mt-4 space-y-2">
+                  {shareLinks.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No share links yet.</p>
+                  ) : (
+                    shareLinks.map((link) => {
+                      const progressUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/progress/${link.token}`
+                      const isRevoked = Boolean(link.revoked_at)
+                      return (
+                        <div key={link.id} className="p-3 border rounded-lg flex items-center justify-between gap-3">
+                          <code className="text-xs bg-gray-100 px-2 py-1 rounded truncate">{progressUrl}</code>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={isRevoked ? 'outline' : 'success'}>{isRevoked ? 'Revoked' : 'Active'}</Badge>
+                            {!isRevoked && (
+                              <Button variant="outline" size="sm" onClick={() => handleRevokeShareLink(link.id)}>
+                                Revoke
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Lesson Notes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Lesson date</Label>
+                    <Input type="date" value={noteDate} onChange={(e) => setNoteDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Title</Label>
+                    <Input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="e.g., Algebra session recap" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Summary</Label>
+                  <Textarea value={noteSummary} onChange={(e) => setNoteSummary(e.target.value)} rows={3} />
+                </div>
+                <div>
+                  <Label>Homework assigned</Label>
+                  <Textarea value={noteHomework} onChange={(e) => setNoteHomework(e.target.value)} rows={2} />
+                </div>
+                <Button onClick={handleAddLessonNote} disabled={progressLoading}>
+                  {progressLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Add Lesson Note
+                </Button>
+
+                <div className="pt-2 space-y-2">
+                  {lessonNotes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No lesson notes yet.</p>
+                  ) : (
+                    lessonNotes.map((note) => (
+                      <div key={note.id} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">{note.title}</p>
+                          <Badge variant="outline">{note.lesson_date}</Badge>
+                        </div>
+                        {note.summary && <p className="text-sm text-muted-foreground mt-1">{note.summary}</p>}
+                        {note.homework_assigned && <p className="text-sm mt-2"><span className="font-medium">Homework:</span> {note.homework_assigned}</p>}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Progress Milestones</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Milestone title</Label>
+                    <Input value={milestoneTitle} onChange={(e) => setMilestoneTitle(e.target.value)} placeholder="e.g., Master quadratic equations" />
+                  </div>
+                  <div>
+                    <Label>Target date</Label>
+                    <Input type="date" value={milestoneTargetDate} onChange={(e) => setMilestoneTargetDate(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <Textarea value={milestoneDescription} onChange={(e) => setMilestoneDescription(e.target.value)} rows={3} />
+                </div>
+                <Button onClick={handleAddMilestone} disabled={milestoneLoading}>
+                  {milestoneLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Add Milestone
+                </Button>
+
+                <div className="pt-2 space-y-2">
+                  {milestones.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No milestones yet.</p>
+                  ) : (
+                    milestones.map((m) => (
+                      <div key={m.id} className="p-3 bg-gray-50 rounded-lg flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{m.title}</p>
+                          {m.description && <p className="text-sm text-muted-foreground mt-1">{m.description}</p>}
+                        </div>
+                        <Badge variant={m.status === 'achieved' ? 'success' : 'secondary'}>{m.status}</Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

@@ -31,11 +31,19 @@ export default async function CalendarPage() {
     .eq('user_id', user.id)
     .single()
 
+  // Get reminder preference
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('reminder_minutes_before')
+    .eq('id', user.id)
+    .single()
+
   return (
     <CalendarContent 
       rules={rules || []}
       bookings={bookings || []}
       slug={site?.slug || ''}
+      reminderMinutesBefore={profile?.reminder_minutes_before || 10}
     />
   )
 }

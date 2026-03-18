@@ -1,4 +1,4 @@
--- TutorLaunch Database Schema
+-- Solo Tutor Suite Database Schema
 -- Run this first in Supabase SQL Editor
 
 -- Enable UUID extension
