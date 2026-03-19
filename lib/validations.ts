@@ -119,14 +119,10 @@ export const homeworkSchema = z.object({
 
 export type HomeworkInput = z.infer<typeof homeworkSchema>
 
-// Zoom meeting link schema
+// Video call link schema – accepts any valid meeting URL (Zoom, Google Meet, Teams…)
 export const zoomMeetingLinkSchema = z
   .string()
   .url('Enter a valid URL')
-  .refine(
-    (value) => /^https?:\/\/([a-z0-9-]+\.)?zoom\.us\//i.test(value),
-    'Enter a valid Zoom meeting link'
-  )
 
 export const studentInviteCodeSchema = z
   .string()

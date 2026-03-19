@@ -316,7 +316,7 @@ export function CalendarContent({ rules, bookings, slug, reminderMinutesBefore }
           <CardContent>
             {/* Add Rule Form */}
             <div className="space-y-4 mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
                   <Label className="text-xs">Day</Label>
                   <Select
@@ -333,14 +333,15 @@ export function CalendarContent({ rules, bookings, slug, reminderMinutesBefore }
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Start</Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <Input
                         type="text"
+                        className="flex-1 min-w-0"
                         value={startTimeInput}
-                        placeholder="e.g. 5:00 or 17:00"
+                        placeholder="9:00"
                         onChange={(e) => setStartTimeInput(e.target.value)}
                         onBlur={() => {
                           const parsed = parseFlexibleTimeInput(startTimeInput, startPeriod)
@@ -362,7 +363,7 @@ export function CalendarContent({ rules, bookings, slug, reminderMinutesBefore }
                           setNewRule({ ...newRule, start_time: parsed.time24 })
                         }}
                       >
-                        <SelectTrigger className="w-20">
+                        <SelectTrigger className="w-[70px] shrink-0">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -374,11 +375,12 @@ export function CalendarContent({ rules, bookings, slug, reminderMinutesBefore }
                   </div>
                   <div>
                     <Label className="text-xs">End</Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <Input
                         type="text"
+                        className="flex-1 min-w-0"
                         value={endTimeInput}
-                        placeholder="e.g. 6:30 or 18:30"
+                        placeholder="5:00"
                         onChange={(e) => setEndTimeInput(e.target.value)}
                         onBlur={() => {
                           const parsed = parseFlexibleTimeInput(endTimeInput, endPeriod)
@@ -400,7 +402,7 @@ export function CalendarContent({ rules, bookings, slug, reminderMinutesBefore }
                           setNewRule({ ...newRule, end_time: parsed.time24 })
                         }}
                       >
-                        <SelectTrigger className="w-20">
+                        <SelectTrigger className="w-[70px] shrink-0">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

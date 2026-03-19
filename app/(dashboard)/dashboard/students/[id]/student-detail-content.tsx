@@ -321,10 +321,10 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Video className="w-5 h-5" />
-            Video Call (Zoom)
+            Video Call Link
           </CardTitle>
           <CardDescription>
-            Add a Zoom meeting link so both you and the student can join from inside the app.
+            Save a meeting link (Zoom, Google Meet, Teams…) so both you and the student can join from inside the app.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -332,7 +332,7 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
             <Input
               value={zoomMeetingLink}
               onChange={(e) => setZoomMeetingLink(e.target.value)}
-              placeholder="https://zoom.us/j/1234567890"
+              placeholder="https://zoom.us/j/... or meet.google.com/..."
             />
             <Button onClick={handleSaveZoomLink} disabled={zoomSaving}>
               {zoomSaving ? (
@@ -346,13 +346,13 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
               <Button variant="outline" asChild>
                 <a href={student.zoom_meeting_link} target="_blank" rel="noopener noreferrer">
                   <Video className="w-4 h-4 mr-2" />
-                  Join Zoom
+                  Join Call
                 </a>
               </Button>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Leave blank and save to remove the Zoom link.
+            Leave blank and save to remove the link.
           </p>
         </CardContent>
       </Card>

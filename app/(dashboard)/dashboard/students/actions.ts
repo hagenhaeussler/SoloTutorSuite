@@ -225,16 +225,34 @@ export async function uploadFileAction(formData: FormData) {
       return { error: 'Missing file or student ID' }
     }
 
-    // Upload to storage
-    const path = `${user.id}/${studentId}/${Date.now()}-${file.name}`
-    const { error: uploadError } = await supabase.storage
+    // Verify ownership with the user (anon) client before writing anything
+    const { data: student } = await supabase
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!student) {
+      return { error: 'Student not found' }
+    }
+
+    // Use the service client for storage and DB writes.
+    // The anon-client JWT is not reliably propagated to PostgREST in
+    // Next.js Server Actions, causing RLS violations even when the user
+    // is authenticated. Ownership has already been verified above.
+    const service = await createServiceClient()
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${user.id}/${studentId}/${Date.now()}-${safeName}`
+
+    const { error: uploadError } = await service.storage
       .from('student-files')
       .upload(path, file)
 
     if (uploadError) throw uploadError
 
     // Save to database
-    const { error: dbError } = await supabase
+    const { error: dbError } = await service
       .from('student_files')
       .insert({
         user_id: user.id,
@@ -317,9 +335,19 @@ export async function updateStudentZoomLinkAction(studentId: string, zoomMeeting
     }
 
     const normalized = zoomMeetingLink.trim()
-    const value = normalized ? zoomMeetingLinkSchema.parse(normalized) : null
+    let value: string | null = null
+    if (normalized) {
+      try {
+        value = zoomMeetingLinkSchema.parse(normalized)
+      } catch (zodErr: any) {
+        const msg = zodErr?.errors?.[0]?.message ?? zodErr?.message ?? 'Enter a valid URL'
+        return { error: msg }
+      }
+    }
 
-    const { error } = await supabase
+    // Use service client to avoid JWT propagation issues in Server Actions
+    const service = await createServiceClient()
+    const { error } = await service
       .from('students')
       .update({ zoom_meeting_link: value })
       .eq('id', studentId)
@@ -330,7 +358,7 @@ export async function updateStudentZoomLinkAction(studentId: string, zoomMeeting
     return { success: true }
   } catch (error: any) {
     console.error('Error updating student Zoom link:', error)
-    return { error: error.message || 'Failed to update Zoom meeting link' }
+    return { error: error.message || 'Failed to update video call link' }
   }
 }
 
