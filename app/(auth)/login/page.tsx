@@ -22,6 +22,11 @@ function LoginPageContent() {
   const requestedRole = searchParams.get('role') === 'student' ? 'student' : 'tutor'
 
   const handleGoogleLogin = async (role: 'tutor' | 'student') => {
+    // Persist intended role in a short-lived cookie so the auth callback
+    // can still determine the role even if Supabase strips our custom
+    // query params from the redirect URL.
+    document.cookie = `auth-intended-role=${role}; path=/; max-age=300; samesite=lax`
+
     const next = role === 'student' ? '/student/app' : '/dashboard'
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
