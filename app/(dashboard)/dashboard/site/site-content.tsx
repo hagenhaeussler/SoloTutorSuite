@@ -69,7 +69,7 @@ export function SiteContent({ site, tutorName, subjects }: SiteContentProps) {
       toast({
         title: publish ? 'Site Published!' : 'Changes Saved',
         description: publish 
-          ? 'Your mini-site is now live!'
+          ? 'Your public website is now live!'
           : 'Your changes have been saved.',
       })
       router.refresh()
@@ -90,7 +90,7 @@ export function SiteContent({ site, tutorName, subjects }: SiteContentProps) {
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Mini-Site</h1>
+          <h1 className="text-2xl font-bold">Public Website</h1>
           <p className="text-muted-foreground">
             Your professional tutor profile page
           </p>
