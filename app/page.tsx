@@ -42,7 +42,7 @@ export default function LandingPage() {
           <br />Stay Independent
         </h1>
         <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-          Get AI-generated marketing plans, professional mini-sites, booking pages, 
+          Get AI-generated marketing plans, professional websites, booking pages, 
           and a CRM—everything you need to attract high-paying students.
         </p>
         <div className="flex gap-4 justify-center">
@@ -76,7 +76,7 @@ export default function LandingPage() {
           />
           <FeatureCard
             icon={<Globe className="w-6 h-6" />}
-            title="Professional Mini-Site"
+            title="Professional Website"
             description="Publish a beautiful tutor profile page to share with potential students."
           />
           <FeatureCard
@@ -118,17 +118,23 @@ export default function LandingPage() {
             <p className="text-blue-100 mb-8 text-lg">
               Join tutors who are using AI to attract better clients and scale their income.
             </p>
-            <Link href="/login">
-              <Button size="lg" variant="secondary" className="gap-2">
-                Continue as Tutor <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="/login?role=student">
-              <Button size="lg" variant="outline" className="gap-2 mt-3">
-                <GraduationCap className="w-4 h-4" />
-                Continue as Student
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link href="/login?role=tutor">
+                <Button size="lg" variant="secondary" className="gap-2 min-w-[240px]">
+                  Continue as Tutor <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+              <Link href="/login?role=student">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="gap-2 min-w-[240px] border-white bg-white text-primary hover:bg-blue-50 hover:text-primary"
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  Continue as Student
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </section>

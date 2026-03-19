@@ -4,8 +4,11 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const role = searchParams.get('role') === 'student' ? 'student' : 'tutor'
+  const roleParam = searchParams.get('role')
   const next = searchParams.get('next') ?? '/dashboard'
+  const nextIndicatesStudent = next.startsWith('/student')
+  const requestedRole: 'student' | 'tutor' =
+    roleParam === 'student' || (roleParam == null && nextIndicatesStudent) ? 'student' : 'tutor'
 
   if (code) {
     const supabase = await createClient()
@@ -23,21 +26,24 @@ export async function GET(request: Request) {
           .eq('id', user.id)
           .single()
 
-        if (!profile || profile.role !== role || (role === 'student' && !profile.student_invite_code)) {
-          const inviteCode = role === 'student'
+        const roleToPersist: 'student' | 'tutor' =
+          roleParam == null && profile?.role ? profile.role : requestedRole
+
+        if (!profile || profile.role !== roleToPersist || (roleToPersist === 'student' && !profile.student_invite_code)) {
+          const inviteCode = roleToPersist === 'student'
             ? (profile?.student_invite_code || `STU-${user.id.slice(0, 8).toUpperCase()}`)
             : null
 
           await supabase
             .from('profiles')
             .update({
-              role,
+              role: roleToPersist,
               student_invite_code: inviteCode,
             })
             .eq('id', user.id)
         }
 
-        if (role === 'student') {
+        if (roleToPersist === 'student') {
           return NextResponse.redirect(`${origin}/student/app`)
         }
 
