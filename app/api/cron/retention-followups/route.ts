@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { processDueRetentionEmailEvents, queueRetentionEvents } from '@/lib/retention-emails'
 
+export const dynamic = 'force-dynamic'
+
 function isAuthorizedCronRequest(request: Request) {
   const secret = process.env.CRON_SECRET
   const url = new URL(request.url)

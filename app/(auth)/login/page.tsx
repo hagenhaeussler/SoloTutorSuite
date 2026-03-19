@@ -6,8 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Sparkles, GraduationCap } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageShell />}>
+      <LoginPageContent />
+    </Suspense>
+  )
+}
+
+function LoginPageContent() {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const requestedRole = searchParams.get('role') === 'student' ? 'student' : 'tutor'
@@ -60,6 +69,42 @@ export default function LoginPage() {
               size="lg"
               variant={requestedRole === 'student' ? 'default' : 'outline'}
             >
+              <GraduationCap className="w-5 h-5" />
+              Continue as Student
+            </Button>
+          </div>
+          <p className="text-center text-sm text-muted-foreground mt-4">
+            By signing in, you agree to our Terms of Service
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function LoginPageShell() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <Link href="/" className="flex items-center justify-center gap-2 mb-4">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <span className="font-bold text-2xl">Solo Tutor Suite</span>
+          </Link>
+          <CardTitle>Welcome</CardTitle>
+          <CardDescription>
+            Sign in to access your tutor dashboard or student workspace.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <Button className="w-full gap-2" size="lg">
+              <Sparkles className="w-5 h-5" />
+              Continue as Tutor
+            </Button>
+            <Button className="w-full gap-2" size="lg" variant="outline">
               <GraduationCap className="w-5 h-5" />
               Continue as Student
             </Button>
