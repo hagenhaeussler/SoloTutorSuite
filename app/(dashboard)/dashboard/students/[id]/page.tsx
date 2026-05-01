@@ -68,6 +68,13 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
+  const { data: subscriptions } = await supabase
+    .from('mock_subscriptions')
+    .select('*')
+    .eq('student_id', id)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+
   return (
     <StudentDetailContent 
       student={student}
@@ -78,6 +85,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
       lessonNotes={lessonNotes || []}
       milestones={milestones || []}
       shareLinks={shareLinks || []}
+      subscriptions={subscriptions || []}
     />
   )
 }

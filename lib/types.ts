@@ -123,6 +123,12 @@ export interface Booking {
   reason: string | null
   reminder_offset_minutes: number
   status: 'confirmed' | 'cancelled'
+  google_calendar_id: string | null
+  google_event_id: string | null
+  google_event_etag: string | null
+  google_html_link: string | null
+  google_sync_status: 'not_synced' | 'synced' | 'failed'
+  google_last_synced_at: string | null
   created_at: string
 }
 
@@ -203,6 +209,12 @@ export interface Homework {
   title: string
   instructions: string | null
   due_date: string | null
+  google_calendar_id: string | null
+  google_event_id: string | null
+  google_event_etag: string | null
+  google_html_link: string | null
+  google_sync_status: 'not_synced' | 'synced' | 'failed'
+  google_last_synced_at: string | null
   created_at: string
 }
 
@@ -252,6 +264,78 @@ export interface ProgressShareLink {
   revoked_at: string | null
   created_by: string | null
   created_at: string
+}
+
+export interface MockSubscription {
+  id: string
+  user_id: string
+  student_id: string
+  plan_name: string
+  description: string | null
+  amount_cents: number
+  currency: string
+  billing_interval: 'weekly' | 'monthly' | 'yearly'
+  status: 'offered' | 'active' | 'cancelled'
+  started_at: string | null
+  cancelled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface GoogleCalendarConnectionSummary {
+  google_email: string | null
+  calendar_id: string
+  connection_status: 'connected' | 'needs_reconnect' | 'disconnected'
+  connected_at: string
+  updated_at: string
+}
+
+export interface CalendarEvent {
+  id: string
+  user_id: string
+  student_id: string | null
+  title: string
+  description: string | null
+  location: string | null
+  start_ts: string
+  end_ts: string
+  event_type: 'calendar_event' | 'lesson_event' | 'student_event' | 'teacher_event'
+  created_by_role: 'student' | 'tutor'
+  google_calendar_id: string | null
+  google_event_id: string | null
+  google_event_etag: string | null
+  google_html_link: string | null
+  google_sync_status: 'not_synced' | 'synced' | 'failed'
+  google_last_synced_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface GoogleCalendarEvent {
+  id: string
+  googleEventId: string
+  title: string
+  description: string | null
+  location: string | null
+  start: string
+  end: string
+  htmlLink: string | null
+  source: 'google'
+  sourceLabel: 'Google'
+  isAllDay: boolean
+}
+
+export type UnifiedCalendarEvent = {
+  id: string
+  title: string
+  description?: string | null
+  location?: string | null
+  start: string
+  end: string
+  source: 'app' | 'booking' | 'homework' | 'google'
+  sourceLabel: string
+  htmlLink?: string | null
+  googleSyncStatus?: 'not_synced' | 'synced' | 'failed'
 }
 
 export interface RetentionEmailEvent {

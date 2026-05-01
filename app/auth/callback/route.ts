@@ -18,6 +18,18 @@ export async function GET(request: Request) {
     || (roleParam == null && cookieRole === 'student')
     || (roleParam == null && cookieRole == null && nextIndicatesStudent)
       ? 'student' : 'tutor'
+  const explicitRoleChoice =
+    roleParam === 'student'
+    || roleParam === 'tutor'
+    || cookieRole === 'student'
+    || cookieRole === 'tutor'
+    || nextIndicatesStudent
+
+  const redirectAndClearRoleCookie = (url: string | URL) => {
+    const response = NextResponse.redirect(url)
+    response.cookies.delete('auth-intended-role')
+    return response
+  }
 
   const supabase = await createClient()
 
@@ -41,9 +53,30 @@ export async function GET(request: Request) {
   // Determine which role to persist
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, student_invite_code')
+    .select('role, student_invite_code, created_at')
     .eq('id', user.id)
     .single()
+
+  const profileCreatedAt = profile?.created_at ? Date.parse(profile.created_at) : NaN
+  const profileWasJustCreated =
+    Number.isFinite(profileCreatedAt) && Date.now() - profileCreatedAt < 2 * 60 * 1000
+  const isFreshDefaultTutorProfile =
+    profile?.role === 'tutor'
+    && requestedRole === 'student'
+    && profileWasJustCreated
+    && !profile.student_invite_code
+
+  if (
+    explicitRoleChoice
+    && profile?.role
+    && profile.role !== requestedRole
+    && !isFreshDefaultTutorProfile
+  ) {
+    const conflictUrl = new URL('/login', origin)
+    conflictUrl.searchParams.set('role', requestedRole)
+    conflictUrl.searchParams.set('role_conflict', profile.role)
+    return redirectAndClearRoleCookie(conflictUrl)
+  }
 
   // Preserve existing role only when there is NO explicit signal
   // (neither query param nor cookie) indicating a role choice.
@@ -67,7 +100,7 @@ export async function GET(request: Request) {
   }
 
   if (roleToPersist === 'student') {
-    return NextResponse.redirect(`${origin}/student/app`)
+    return redirectAndClearRoleCookie(`${origin}/student/app`)
   }
 
   const { data: onboarding } = await supabase
@@ -78,8 +111,8 @@ export async function GET(request: Request) {
 
   // Redirect to onboarding if not completed
   if (!onboarding?.completed) {
-    return NextResponse.redirect(`${origin}/onboarding`)
+    return redirectAndClearRoleCookie(`${origin}/onboarding`)
   }
 
-  return NextResponse.redirect(`${origin}${next}`)
+  return redirectAndClearRoleCookie(`${origin}${next}`)
 }

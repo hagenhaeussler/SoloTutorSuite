@@ -1,10 +1,11 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { AppLogo } from '@/components/app-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Sparkles, Calendar, CheckCircle } from 'lucide-react'
+import { Calendar, CheckCircle } from 'lucide-react'
 import { InquiryForm } from './inquiry-form'
 
 export default async function TutorSitePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -44,12 +45,7 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: accentColor }}>
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold">Solo Tutor Suite</span>
-          </div>
+          <AppLogo href="/" size="sm" textClassName="text-base" />
           <Link href={bookingUrl}>
             <Button style={{ backgroundColor: accentColor }}>
               <Calendar className="w-4 h-4 mr-2" />
@@ -185,7 +181,7 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="container mx-auto px-4 text-center text-gray-600 text-sm">
-          <p>Powered by Solo Tutor Suite</p>
+          <p>Powered by SoloTutorSuite</p>
         </div>
       </footer>
     </div>

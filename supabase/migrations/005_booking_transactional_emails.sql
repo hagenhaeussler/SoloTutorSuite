@@ -1,4 +1,4 @@
--- Solo Tutor Suite: transactional booking emails + reminders
+-- SoloTutorSuite: transactional booking emails + reminders
 
 -- Tutor-level reminder preference (default: 10 minutes)
 ALTER TABLE profiles

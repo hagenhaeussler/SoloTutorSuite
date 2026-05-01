@@ -2,12 +2,13 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { AppLogo } from '@/components/app-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/components/ui/use-toast'
-import { GraduationCap, FileText, ClipboardList, Download, Upload, Loader2, Check, Video } from 'lucide-react'
+import { FileText, ClipboardList, Download, Upload, Loader2, Check, Video } from 'lucide-react'
 import type { Student, StudentFile, Homework, HomeworkSubmission } from '@/lib/types'
 import { downloadFileAction, uploadFileAction, submitHomeworkAction } from './actions'
 import { formatDate } from '@/lib/utils'
@@ -85,9 +86,7 @@ export function StudentPortalContent({
       <header className="border-b bg-white">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-white" />
-            </div>
+            <AppLogo href="/" size="md" showText={false} />
             <div>
               <h1 className="font-bold">{student.name}&apos;s Portal</h1>
               <p className="text-sm text-muted-foreground">with {tutorName}</p>

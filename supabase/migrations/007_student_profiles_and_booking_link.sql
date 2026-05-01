@@ -1,4 +1,4 @@
--- Solo Tutor Suite: richer student profiles + direct booking-to-student linkage
+-- SoloTutorSuite: richer student profiles + direct booking-to-student linkage
 
 -- 1) Extend students profile fields
 ALTER TABLE students

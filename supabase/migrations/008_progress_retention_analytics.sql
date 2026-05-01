@@ -1,4 +1,4 @@
--- Solo Tutor Suite: progress sharing + retention automations + analytics foundations
+-- SoloTutorSuite: progress sharing + retention automations + analytics foundations
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 

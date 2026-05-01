@@ -1,4 +1,4 @@
--- Solo Tutor Suite: student mode + tutor/student chat
+-- SoloTutorSuite: student mode + tutor/student chat
 
 -- Role + shareable student ID on profiles
 ALTER TABLE profiles

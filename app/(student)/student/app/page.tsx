@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { StudentAppContent } from './student-app-content'
+import { getGoogleCalendarConnection, toGoogleCalendarConnectionSummary } from '@/lib/google-calendar/client'
+import { listGoogleEvents } from '@/lib/google-calendar/events'
 
 export default async function StudentAppPage() {
   const supabase = await createClient()
@@ -26,6 +28,9 @@ export default async function StudentAppPage() {
   if (profile.role !== 'student') {
     redirect('/dashboard')
   }
+
+  const rangeStart = new Date()
+  const rangeEnd = new Date(rangeStart.getTime() + 30 * 24 * 60 * 60 * 1000)
 
   const { data: connections } = await service
     .from('students')
@@ -108,6 +113,40 @@ export default async function StudentAppPage() {
         .order('created_at', { ascending: false })
     : { data: [] as any[] }
 
+  const { data: subscriptions } = connectionStudentIds.length
+    ? await service
+        .from('mock_subscriptions')
+        .select('*')
+        .in('student_id', connectionStudentIds)
+        .order('created_at', { ascending: false })
+    : { data: [] as any[] }
+
+  const { data: ownCalendarEvents } = await service
+    .from('calendar_events')
+    .select('*')
+    .eq('user_id', user.id)
+    .gte('start_ts', rangeStart.toISOString())
+    .lte('start_ts', rangeEnd.toISOString())
+    .order('start_ts', { ascending: true })
+
+  const { data: linkedCalendarEvents } = connectionStudentIds.length
+    ? await service
+        .from('calendar_events')
+        .select('*')
+        .in('student_id', connectionStudentIds)
+        .neq('user_id', user.id)
+        .gte('start_ts', rangeStart.toISOString())
+        .lte('start_ts', rangeEnd.toISOString())
+        .order('start_ts', { ascending: true })
+    : { data: [] as any[] }
+
+  const calendarEventsById = new Map(
+    [...(ownCalendarEvents || []), ...(linkedCalendarEvents || [])].map((event) => [event.id, event])
+  )
+  const calendarEvents = Array.from(calendarEventsById.values()).sort(
+    (a, b) => new Date(a.start_ts).getTime() - new Date(b.start_ts).getTime()
+  )
+
   const candidateEmails = Array.from(
     new Set(
       [profile.email, ...(connections || []).map((c) => c.email)]
@@ -125,6 +164,29 @@ export default async function StudentAppPage() {
         .order('start_ts', { ascending: false })
     : { data: [] as any[] }
 
+  let googleConnection = null
+  let googleEvents: any[] = []
+  let googleWarning: string | null = null
+
+  try {
+    const connection = await getGoogleCalendarConnection(user.id)
+    googleConnection = toGoogleCalendarConnectionSummary(connection)
+
+    if (connection?.connection_status === 'connected') {
+      const excludeGoogleEventIds = (calendarEvents || [])
+        .map((event: any) => event.google_event_id)
+        .filter(Boolean) as string[]
+
+      googleEvents = await listGoogleEvents(user.id, {
+        timeMin: rangeStart.toISOString(),
+        timeMax: rangeEnd.toISOString(),
+        excludeGoogleEventIds,
+      })
+    }
+  } catch (error: any) {
+    googleWarning = error?.message || 'Google Calendar events could not be loaded.'
+  }
+
   return (
     <StudentAppContent
       studentName={profile.name || 'Student'}
@@ -138,6 +200,13 @@ export default async function StudentAppPage() {
       chatMessages={chatMessages || []}
       lessonNotes={lessonNotes || []}
       milestones={milestones || []}
+      subscriptions={subscriptions || []}
+      calendarEvents={calendarEvents || []}
+      googleConnection={googleConnection}
+      googleEvents={googleEvents}
+      googleWarning={googleWarning}
+      initialRangeStart={rangeStart.toISOString()}
+      initialRangeEnd={rangeEnd.toISOString()}
     />
   )
 }

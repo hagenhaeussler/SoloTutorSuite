@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { AppLogo } from '@/components/app-logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Sparkles, X, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react'
+import { X, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 import { generateSlug } from '@/lib/utils'
 
@@ -157,12 +158,7 @@ export default function OnboardingPage() {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-bold text-2xl">Solo Tutor Suite</span>
-          </div>
+          <AppLogo href="/" size="md" className="mb-4 justify-center" />
           <h1 className="text-2xl font-bold">Let&apos;s set up your profile</h1>
           <p className="text-muted-foreground">This helps us create your personalized growth plan</p>
         </div>

@@ -159,6 +159,30 @@ export const progressShareLinkSchema = z.object({
   expires_in_days: z.number().int().min(1).max(365).optional(),
 })
 
+export const mockSubscriptionOfferSchema = z.object({
+  student_id: z.string().uuid(),
+  plan_name: z.string().trim().min(1, 'Enter a plan name').max(120, 'Plan name is too long'),
+  description: z.string().max(2000, 'Description is too long').optional().or(z.literal('')),
+  amount_dollars: z.number().min(0, 'Amount cannot be negative').max(100000, 'Amount is too high'),
+  billing_interval: z.enum(['weekly', 'monthly', 'yearly']).default('monthly'),
+})
+
+export const appCalendarEventSchema = z
+  .object({
+    student_id: z.string().uuid().optional().or(z.literal('')),
+    title: z.string().trim().min(1, 'Enter a title').max(200, 'Title is too long'),
+    description: z.string().max(5000, 'Description is too long').optional().or(z.literal('')),
+    location: z.string().max(500, 'Location is too long').optional().or(z.literal('')),
+    start_ts: z.string().datetime('Enter a valid start date and time'),
+    end_ts: z.string().datetime('Enter a valid end date and time'),
+    event_type: z.enum(['calendar_event', 'lesson_event', 'student_event', 'teacher_event']).default('calendar_event'),
+    add_to_google_calendar: z.boolean().default(true),
+  })
+  .refine((value) => new Date(value.end_ts).getTime() > new Date(value.start_ts).getTime(), {
+    message: 'End time must be later than start time',
+    path: ['end_ts'],
+  })
+
 export const tutorInquirySchema = z.object({
   tutor_slug: z.string().min(1),
   name: z.string().min(1).max(120),
@@ -170,4 +194,6 @@ export const tutorInquirySchema = z.object({
 export type LessonNoteInput = z.infer<typeof lessonNoteSchema>
 export type ProgressMilestoneInput = z.infer<typeof progressMilestoneSchema>
 export type ProgressShareLinkInput = z.infer<typeof progressShareLinkSchema>
+export type MockSubscriptionOfferInput = z.infer<typeof mockSubscriptionOfferSchema>
+export type AppCalendarEventInput = z.infer<typeof appCalendarEventSchema>
 export type TutorInquiryInput = z.infer<typeof tutorInquirySchema>

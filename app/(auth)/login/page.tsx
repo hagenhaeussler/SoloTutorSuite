@@ -1,9 +1,10 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { AppLogo } from '@/components/app-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Sparkles, GraduationCap } from 'lucide-react'
+import { AlertTriangle, Sparkles, GraduationCap } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
@@ -20,6 +21,12 @@ function LoginPageContent() {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const requestedRole = searchParams.get('role') === 'student' ? 'student' : 'tutor'
+  const roleConflictParam = searchParams.get('role_conflict')
+  const roleConflict =
+    roleConflictParam === 'student' || roleConflictParam === 'tutor'
+      ? roleConflictParam
+      : null
+  const authError = searchParams.get('error')
 
   const handleGoogleLogin = async (role: 'tutor' | 'student') => {
     // Persist intended role in a short-lived cookie so the auth callback
@@ -32,6 +39,9 @@ function LoginPageContent() {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback?role=${role}&next=${encodeURIComponent(next)}`,
+        queryParams: {
+          prompt: 'select_account',
+        },
       },
     })
 
@@ -44,20 +54,40 @@ function LoginPageContent() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-bold text-2xl">Solo Tutor Suite</span>
-          </Link>
+          <AppLogo href="/" size="md" className="mb-4 justify-center" />
           <CardTitle>Welcome</CardTitle>
           <CardDescription>
             {requestedRole === 'student'
-              ? 'Sign in as a student to access homework, bookings, billing, and chat.'
+              ? 'Sign in as a student to access homework, bookings, financials, and chat.'
               : 'Sign in to access your tutor dashboard and grow your tutoring business.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {roleConflict && (
+            <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <div>
+                  <p className="font-medium">This email is already a {roleConflict} account.</p>
+                  <p className="mt-1 text-yellow-800">
+                    Use a different Google account to continue as a {requestedRole}, or open your existing{' '}
+                    <Link
+                      href={roleConflict === 'student' ? '/student/app' : '/dashboard'}
+                      className="font-medium underline underline-offset-2"
+                    >
+                      {roleConflict} dashboard
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {authError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+              {authError}
+            </div>
+          )}
           <div className="space-y-3">
             <Button
               onClick={() => handleGoogleLogin('tutor')}
@@ -92,12 +122,7 @@ function LoginPageShell() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <Link href="/" className="flex items-center justify-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-bold text-2xl">Solo Tutor Suite</span>
-          </Link>
+          <AppLogo href="/" size="md" className="mb-4 justify-center" />
           <CardTitle>Welcome</CardTitle>
           <CardDescription>
             Sign in to access your tutor dashboard or student workspace.

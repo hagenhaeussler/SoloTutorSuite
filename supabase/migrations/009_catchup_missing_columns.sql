@@ -1,4 +1,4 @@
--- Solo Tutor Suite: catch-up migration
+-- SoloTutorSuite: catch-up migration
 -- Adds every column that earlier migrations defined but that may not have
 -- been applied to the live database yet.  All statements are idempotent
 -- (IF NOT EXISTS / DO $$ checks) so running this file twice is safe.

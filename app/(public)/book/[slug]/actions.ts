@@ -3,6 +3,8 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { bookingSchema, type BookingInput } from '@/lib/validations'
 import { queueBookingEmailsAndSendConfirmations } from '@/lib/booking-emails'
+import { GoogleCalendarConnectionError } from '@/lib/google-calendar/client'
+import { createGoogleEventForAppEvent } from '@/lib/google-calendar/events'
 
 export async function createBookingAction(data: BookingInput) {
   try {
@@ -66,10 +68,42 @@ export async function createBookingAction(data: BookingInput) {
         reminder_offset_minutes: reminderOffset,
         status: 'confirmed',
       })
-      .select('id, user_id, student_id, start_ts, prospect_name, prospect_email, parent_guardian_email, reminder_offset_minutes')
+      .select('id, user_id, student_id, start_ts, end_ts, prospect_name, prospect_email, parent_guardian_email, reason, reminder_offset_minutes')
       .single()
 
     if (bookingError) throw bookingError
+
+    try {
+      const googleResult = await createGoogleEventForAppEvent(site.user_id, {
+        id: booking.id,
+        type: 'booking',
+        title: `Lesson with ${booking.prospect_name}`,
+        description: booking.reason,
+        start: booking.start_ts,
+        end: booking.end_ts,
+        attendees: [
+          { email: booking.prospect_email, displayName: booking.prospect_name },
+          ...(booking.parent_guardian_email ? [{ email: booking.parent_guardian_email }] : []),
+        ],
+      })
+
+      await supabase
+        .from('bookings')
+        .update(googleResult)
+        .eq('id', booking.id)
+        .eq('user_id', booking.user_id)
+    } catch (syncError: any) {
+      if (!(syncError instanceof GoogleCalendarConnectionError && syncError.code === 'not_connected')) {
+        await supabase
+          .from('bookings')
+          .update({
+            google_sync_status: 'failed',
+            google_last_synced_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id)
+          .eq('user_id', booking.user_id)
+      }
+    }
 
     // Send confirmation emails now and queue reminders.
     await queueBookingEmailsAndSendConfirmations({

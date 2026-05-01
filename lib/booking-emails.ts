@@ -52,27 +52,27 @@ function buildEmailContent(kind: EmailKind, role: RecipientRole, context: Bookin
   if (kind === 'confirmation') {
     if (role === 'tutor') {
       const subject = `New booking confirmed: ${context.studentName} on ${lessonDate}`
-      const text = `Hi ${context.tutorName},\n\nA new lesson has been confirmed with ${context.studentName}.\nTime: ${lessonDate}\nStudent email: ${context.studentEmail}\n\n- Solo Tutor Suite`
-      const html = `<p>Hi ${context.tutorName},</p><p>A new lesson has been confirmed with <strong>${context.studentName}</strong>.</p><p><strong>Time:</strong> ${lessonDate}<br/><strong>Student email:</strong> ${context.studentEmail}</p><p>- Solo Tutor Suite</p>`
+      const text = `Hi ${context.tutorName},\n\nA new lesson has been confirmed with ${context.studentName}.\nTime: ${lessonDate}\nStudent email: ${context.studentEmail}\n\n- SoloTutorSuite`
+      const html = `<p>Hi ${context.tutorName},</p><p>A new lesson has been confirmed with <strong>${context.studentName}</strong>.</p><p><strong>Time:</strong> ${lessonDate}<br/><strong>Student email:</strong> ${context.studentEmail}</p><p>- SoloTutorSuite</p>`
       return { subject, text, html }
     }
 
     const subject = `Booking confirmed with ${context.tutorName} on ${lessonDate}`
-    const text = `Hi ${recipient},\n\nYour lesson with ${context.tutorName} is confirmed.\nTime: ${lessonDate}\n\n- Solo Tutor Suite`
-    const html = `<p>Hi ${recipient},</p><p>Your lesson with <strong>${context.tutorName}</strong> is confirmed.</p><p><strong>Time:</strong> ${lessonDate}</p><p>- Solo Tutor Suite</p>`
+    const text = `Hi ${recipient},\n\nYour lesson with ${context.tutorName} is confirmed.\nTime: ${lessonDate}\n\n- SoloTutorSuite`
+    const html = `<p>Hi ${recipient},</p><p>Your lesson with <strong>${context.tutorName}</strong> is confirmed.</p><p><strong>Time:</strong> ${lessonDate}</p><p>- SoloTutorSuite</p>`
     return { subject, text, html }
   }
 
   if (role === 'tutor') {
     const subject = `Reminder: lesson with ${context.studentName} starts in ${context.reminderOffsetMinutes} minutes`
-    const text = `Hi ${context.tutorName},\n\nReminder: your lesson with ${context.studentName} starts in ${context.reminderOffsetMinutes} minutes.\nStart time: ${lessonDate}\n\n- Solo Tutor Suite`
-    const html = `<p>Hi ${context.tutorName},</p><p>Reminder: your lesson with <strong>${context.studentName}</strong> starts in ${context.reminderOffsetMinutes} minutes.</p><p><strong>Start time:</strong> ${lessonDate}</p><p>- Solo Tutor Suite</p>`
+    const text = `Hi ${context.tutorName},\n\nReminder: your lesson with ${context.studentName} starts in ${context.reminderOffsetMinutes} minutes.\nStart time: ${lessonDate}\n\n- SoloTutorSuite`
+    const html = `<p>Hi ${context.tutorName},</p><p>Reminder: your lesson with <strong>${context.studentName}</strong> starts in ${context.reminderOffsetMinutes} minutes.</p><p><strong>Start time:</strong> ${lessonDate}</p><p>- SoloTutorSuite</p>`
     return { subject, text, html }
   }
 
   const subject = `Reminder: your lesson with ${context.tutorName} starts in ${context.reminderOffsetMinutes} minutes`
-  const text = `Hi ${recipient},\n\nReminder: your lesson with ${context.tutorName} starts in ${context.reminderOffsetMinutes} minutes.\nStart time: ${lessonDate}\n\n- Solo Tutor Suite`
-  const html = `<p>Hi ${recipient},</p><p>Reminder: your lesson with <strong>${context.tutorName}</strong> starts in ${context.reminderOffsetMinutes} minutes.</p><p><strong>Start time:</strong> ${lessonDate}</p><p>- Solo Tutor Suite</p>`
+  const text = `Hi ${recipient},\n\nReminder: your lesson with ${context.tutorName} starts in ${context.reminderOffsetMinutes} minutes.\nStart time: ${lessonDate}\n\n- SoloTutorSuite`
+  const html = `<p>Hi ${recipient},</p><p>Reminder: your lesson with <strong>${context.tutorName}</strong> starts in ${context.reminderOffsetMinutes} minutes.</p><p><strong>Start time:</strong> ${lessonDate}</p><p>- SoloTutorSuite</p>`
   return { subject, text, html }
 }
 

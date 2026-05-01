@@ -11,9 +11,11 @@ import {
   lessonNoteSchema,
   progressMilestoneSchema,
   progressShareLinkSchema,
+  mockSubscriptionOfferSchema,
   type StudentInput,
   type HomeworkInput,
   type UpdateStudentProfileInput,
+  type MockSubscriptionOfferInput,
 } from '@/lib/validations'
 
 export async function addStudentAction(data: StudentInput) {
@@ -84,6 +86,7 @@ export async function updateStudentProfileAction(data: UpdateStudentProfileInput
 export async function addStudentByInviteCodeAction(inviteCodeInput: string) {
   try {
     const supabase = await createClient()
+    const service = await createServiceClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -94,17 +97,17 @@ export async function addStudentByInviteCodeAction(inviteCodeInput: string) {
 
     const inviteCode = studentInviteCodeSchema.parse(inviteCodeInput.trim().toUpperCase())
 
-    const { data: studentProfile, error: profileError } = await supabase
+    const { data: studentProfile } = await service
       .from('profiles')
       .select('id, name, email, role')
       .eq('student_invite_code', inviteCode)
-      .single()
+      .maybeSingle()
 
-    if (profileError || !studentProfile || studentProfile.role !== 'student') {
+    if (!studentProfile || studentProfile.role !== 'student') {
       return { error: 'Student ID not found' }
     }
 
-    const { data: existing } = await supabase
+    const { data: existing } = await service
       .from('students')
       .select('id')
       .eq('user_id', user.id)
@@ -115,7 +118,43 @@ export async function addStudentByInviteCodeAction(inviteCodeInput: string) {
       return { success: true, alreadyExists: true }
     }
 
-    const { error } = await supabase.from('students').insert({
+    const normalizedStudentEmail = studentProfile.email?.trim().toLowerCase()
+
+    if (normalizedStudentEmail) {
+      const { data: tutorStudents } = await service
+        .from('students')
+        .select('id, email, auth_user_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+
+      const matchingStudents = (tutorStudents || []).filter(
+        (student) => student.email?.trim().toLowerCase() === normalizedStudentEmail
+      )
+      const unlinkedStudent = matchingStudents.find((student) => !student.auth_user_id)
+
+      if (unlinkedStudent) {
+        const { error: updateError } = await service
+          .from('students')
+          .update({
+            auth_user_id: studentProfile.id,
+            email: unlinkedStudent.email || studentProfile.email,
+          })
+          .eq('id', unlinkedStudent.id)
+          .eq('user_id', user.id)
+
+        if (updateError) throw updateError
+
+        return { success: true, linkedExisting: true }
+      }
+
+      if (matchingStudents.some((student) => student.auth_user_id && student.auth_user_id !== studentProfile.id)) {
+        return {
+          error: 'A student with that email is already linked to a different student account.',
+        }
+      }
+    }
+
+    const { error } = await service.from('students').insert({
       user_id: user.id,
       auth_user_id: studentProfile.id,
       name: studentProfile.name || 'Student',
@@ -495,6 +534,140 @@ export async function addProgressMilestoneAction(data: {
   } catch (error: any) {
     console.error('Error adding milestone:', error)
     return { error: error.message || 'Failed to add milestone' }
+  }
+}
+
+export async function toggleProgressMilestoneAction(milestoneId: string, achieved: boolean) {
+  try {
+    const supabase = await createClient()
+    const service = await createServiceClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Not authenticated' }
+
+    const { data: milestone } = await service
+      .from('progress_milestones')
+      .select('id')
+      .eq('id', milestoneId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!milestone) return { error: 'Milestone not found' }
+
+    const { error } = await service
+      .from('progress_milestones')
+      .update({
+        status: achieved ? 'achieved' : 'pending',
+        achieved_at: achieved ? new Date().toISOString() : null,
+      })
+      .eq('id', milestone.id)
+      .eq('user_id', user.id)
+
+    if (error) throw error
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error toggling milestone:', error)
+    return { error: error.message || 'Failed to update milestone' }
+  }
+}
+
+export async function offerMockSubscriptionAction(data: MockSubscriptionOfferInput) {
+  try {
+    const supabase = await createClient()
+    const service = await createServiceClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Not authenticated' }
+
+    const validated = mockSubscriptionOfferSchema.parse(data)
+
+    const { data: student } = await service
+      .from('students')
+      .select('id')
+      .eq('id', validated.student_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!student) return { error: 'Student not found' }
+
+    const { data: existing } = await service
+      .from('mock_subscriptions')
+      .select('id, status')
+      .eq('student_id', student.id)
+      .eq('user_id', user.id)
+      .in('status', ['offered', 'active'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (existing?.status === 'offered') {
+      return { error: 'This student already has a subscription offer. Cancel it before offering a new one.' }
+    }
+
+    if (existing?.status === 'active') {
+      return { error: 'This student already has an active subscription. Cancel it before offering a new one.' }
+    }
+
+    const { error } = await service
+      .from('mock_subscriptions')
+      .insert({
+        user_id: user.id,
+        student_id: student.id,
+        plan_name: validated.plan_name,
+        description: validated.description || null,
+        amount_cents: Math.round(validated.amount_dollars * 100),
+        currency: 'USD',
+        billing_interval: validated.billing_interval,
+        status: 'offered',
+      })
+
+    if (error) throw error
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error offering mock subscription:', error)
+    return { error: error.message || 'Failed to offer subscription' }
+  }
+}
+
+export async function cancelMockSubscriptionAction(subscriptionId: string) {
+  try {
+    const supabase = await createClient()
+    const service = await createServiceClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Not authenticated' }
+
+    const { data: subscription } = await service
+      .from('mock_subscriptions')
+      .select('id, status')
+      .eq('id', subscriptionId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!subscription) return { error: 'Subscription not found' }
+
+    if (subscription.status === 'cancelled') return { success: true }
+
+    const { error } = await service
+      .from('mock_subscriptions')
+      .update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+      })
+      .eq('id', subscription.id)
+      .eq('user_id', user.id)
+
+    if (error) throw error
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error cancelling mock subscription:', error)
+    return { error: error.message || 'Failed to cancel subscription' }
   }
 }
 

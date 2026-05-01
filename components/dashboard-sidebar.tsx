@@ -3,12 +3,12 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { AppLogo } from '@/components/app-logo'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import {
-  Sparkles,
   TrendingUp,
   BarChart3,
   FileText,
@@ -52,12 +52,7 @@ export function DashboardSidebar({ user, profile, slug }: DashboardSidebarProps)
     <aside className="w-64 bg-white border-r flex flex-col">
       {/* Logo */}
       <div className="p-4 border-b">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-bold text-lg">Solo Tutor Suite</span>
-        </Link>
+        <AppLogo href="/dashboard" size="sm" />
       </div>
 
       {/* Navigation */}

@@ -1,4 +1,4 @@
--- Solo Tutor Suite Storage Policies
+-- SoloTutorSuite Storage Policies
 -- Run this AFTER creating the 'student-files' bucket in Storage
 
 -- First, create the bucket if it doesn't exist (run in SQL editor)

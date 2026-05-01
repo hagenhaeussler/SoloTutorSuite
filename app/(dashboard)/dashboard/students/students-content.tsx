@@ -111,6 +111,8 @@ export function StudentsContent({ students }: StudentsContentProps) {
 
       if (result.alreadyExists) {
         toast({ title: 'Already linked', description: 'That student is already in your Students Hub.' })
+      } else if (result.linkedExisting) {
+        toast({ title: 'Existing student linked!', description: 'The student profile you already created is now connected to their student account.' })
       } else {
         toast({ title: 'Student linked!', description: 'The student was added via their student ID.' })
       }
@@ -222,7 +224,7 @@ export function StudentsContent({ students }: StudentsContentProps) {
             Add Student by Student ID
           </CardTitle>
           <CardDescription>
-            Students can share their personal ID so you can add/link them directly.
+            Students can share their personal ID so you can add them directly, or link a profile you already created with the same email.
           </CardDescription>
         </CardHeader>
         <CardContent>

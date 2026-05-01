@@ -1,8 +1,10 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { availabilityRuleSchema, type AvailabilityRuleInput } from '@/lib/validations'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { availabilityRuleSchema, appCalendarEventSchema, type AvailabilityRuleInput, type AppCalendarEventInput } from '@/lib/validations'
 import { cancelPendingReminderEmailEvents, reschedulePendingReminderEmailEvents } from '@/lib/booking-emails'
+import { GoogleCalendarConnectionError } from '@/lib/google-calendar/client'
+import { createGoogleEventForAppEvent, listGoogleEvents } from '@/lib/google-calendar/events'
 
 export async function addRuleAction(data: AvailabilityRuleInput) {
   try {
@@ -160,5 +162,137 @@ export async function rescheduleBookingAction(bookingId: string, startTs: string
   } catch (error: any) {
     console.error('Error rescheduling booking:', error)
     return { error: error.message || 'Failed to reschedule booking' }
+  }
+}
+
+export async function createTeacherCalendarEventAction(data: AppCalendarEventInput) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { error: 'Not authenticated' }
+    }
+
+    const validated = appCalendarEventSchema.parse(data)
+    const service = await createServiceClient()
+    const { data: event, error } = await service
+      .from('calendar_events')
+      .insert({
+        user_id: user.id,
+        student_id: validated.student_id || null,
+        title: validated.title,
+        description: validated.description || null,
+        location: validated.location || null,
+        start_ts: validated.start_ts,
+        end_ts: validated.end_ts,
+        event_type: validated.event_type === 'lesson_event' ? 'lesson_event' : 'teacher_event',
+        created_by_role: 'tutor',
+        google_sync_status: validated.add_to_google_calendar ? 'not_synced' : 'not_synced',
+      })
+      .select('id, title, description, location, start_ts, end_ts, event_type')
+      .single()
+
+    if (error) throw error
+
+    let warning: string | null = null
+    if (validated.add_to_google_calendar) {
+      try {
+        const googleResult = await createGoogleEventForAppEvent(user.id, {
+          id: event.id,
+          type: event.event_type,
+          title: event.title,
+          description: event.description,
+          location: event.location,
+          start: event.start_ts,
+          end: event.end_ts,
+        })
+
+        await service
+          .from('calendar_events')
+          .update(googleResult)
+          .eq('id', event.id)
+          .eq('user_id', user.id)
+      } catch (syncError: any) {
+        warning = syncError instanceof GoogleCalendarConnectionError
+          ? syncError.message
+          : 'The event was saved, but Google Calendar sync failed.'
+
+        if (!(syncError instanceof GoogleCalendarConnectionError && syncError.code === 'not_connected')) {
+          await service
+            .from('calendar_events')
+            .update({
+              google_sync_status: 'failed',
+              google_last_synced_at: new Date().toISOString(),
+            })
+            .eq('id', event.id)
+            .eq('user_id', user.id)
+        }
+      }
+    }
+
+    return { success: true, warning }
+  } catch (error: any) {
+    console.error('Error creating teacher calendar event:', error)
+    return { error: error.message || 'Failed to create calendar event' }
+  }
+}
+
+export async function listTeacherGoogleEventsAction(input: { timeMin: string; timeMax: string; timeZone?: string }) {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { error: 'Not authenticated' }
+    }
+
+    const timeMin = new Date(input.timeMin)
+    const timeMax = new Date(input.timeMax)
+
+    if (Number.isNaN(timeMin.getTime()) || Number.isNaN(timeMax.getTime()) || timeMax <= timeMin) {
+      return { error: 'Invalid calendar range' }
+    }
+
+    const [{ data: appEvents }, { data: bookings }] = await Promise.all([
+      supabase
+        .from('calendar_events')
+        .select('google_event_id')
+        .eq('user_id', user.id)
+        .not('google_event_id', 'is', null)
+        .gte('start_ts', input.timeMin)
+        .lte('start_ts', input.timeMax),
+      supabase
+        .from('bookings')
+        .select('google_event_id')
+        .eq('user_id', user.id)
+        .not('google_event_id', 'is', null)
+        .gte('start_ts', input.timeMin)
+        .lte('start_ts', input.timeMax),
+    ])
+
+    const excludeGoogleEventIds = [
+      ...(appEvents || []).map((event) => event.google_event_id).filter(Boolean),
+      ...(bookings || []).map((booking) => booking.google_event_id).filter(Boolean),
+    ] as string[]
+    const events = await listGoogleEvents(user.id, {
+      timeMin: input.timeMin,
+      timeMax: input.timeMax,
+      timeZone: input.timeZone,
+      excludeGoogleEventIds,
+    })
+
+    return { success: true, events }
+  } catch (error: any) {
+    if (error instanceof GoogleCalendarConnectionError) {
+      return { success: true, events: [], warning: error.message }
+    }
+
+    console.error('Error listing teacher Google Calendar events:', error)
+    return { error: error.message || 'Failed to load Google Calendar events' }
   }
 }

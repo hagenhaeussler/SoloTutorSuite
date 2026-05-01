@@ -77,3 +77,54 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+
+@keyframes milestone-achieved-pop {
+  0% {
+    transform: scale(0.98);
+    box-shadow: 0 0 0 0 rgb(34 197 94 / 0.32);
+  }
+  45% {
+    transform: scale(1.015);
+    box-shadow: 0 0 0 8px rgb(34 197 94 / 0.12);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(34 197 94 / 0);
+  }
+}
+
+@keyframes milestone-shine-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(160%) skewX(-18deg);
+  }
+}
+
+.milestone-achieved {
+  animation: milestone-achieved-pop 700ms ease-out;
+}
+
+.milestone-achieved::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.72) 45%,
+    transparent 64%
+  );
+  animation: milestone-shine-sweep 760ms ease-out;
+}
+
+.progress-fill-celebrate {
+  animation: milestone-achieved-pop 700ms ease-out;
+}

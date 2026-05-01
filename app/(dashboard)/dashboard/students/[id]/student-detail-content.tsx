@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -11,11 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { ArrowLeft, Copy, Upload, FileText, ClipboardList, Loader2, Plus, Trash2, Download, Check, Video, Save, MessageSquare, Send, BarChart3, Link2 } from 'lucide-react'
-import type { Student, StudentFile, Homework, HomeworkSubmission, StudentChatMessage, LessonNote, ProgressMilestone, ProgressShareLink } from '@/lib/types'
-import { uploadFileAction, deleteFileAction, getSignedUrlAction, addHomeworkAction, deleteHomeworkAction, deleteStudentAction, updateStudentZoomLinkAction, sendTutorChatMessageAction, addLessonNoteAction, addProgressMilestoneAction, createProgressShareLinkAction, revokeProgressShareLinkAction } from '../actions'
-import { formatDate } from '@/lib/utils'
+import { ArrowLeft, Copy, Upload, FileText, ClipboardList, Loader2, Plus, Trash2, Download, Check, Video, Save, MessageSquare, Send, BarChart3, Link2, CheckCircle2, CreditCard } from 'lucide-react'
+import type { Student, StudentFile, Homework, HomeworkSubmission, StudentChatMessage, LessonNote, ProgressMilestone, ProgressShareLink, MockSubscription } from '@/lib/types'
+import { uploadFileAction, deleteFileAction, getSignedUrlAction, addHomeworkAction, deleteHomeworkAction, deleteStudentAction, updateStudentZoomLinkAction, sendTutorChatMessageAction, addLessonNoteAction, addProgressMilestoneAction, toggleProgressMilestoneAction, offerMockSubscriptionAction, cancelMockSubscriptionAction, createProgressShareLinkAction, revokeProgressShareLinkAction } from '../actions'
+import { cn, formatDate } from '@/lib/utils'
 
 interface StudentDetailContentProps {
   student: Student
@@ -26,9 +27,10 @@ interface StudentDetailContentProps {
   lessonNotes: LessonNote[]
   milestones: ProgressMilestone[]
   shareLinks: ProgressShareLink[]
+  subscriptions: MockSubscription[]
 }
 
-export function StudentDetailContent({ student, files, homework, submissions, chatMessages, lessonNotes, milestones, shareLinks }: StudentDetailContentProps) {
+export function StudentDetailContent({ student, files, homework, submissions, chatMessages, lessonNotes, milestones, shareLinks, subscriptions }: StudentDetailContentProps) {
   const [uploading, setUploading] = useState(false)
   const [hwDialogOpen, setHwDialogOpen] = useState(false)
   const [hwLoading, setHwLoading] = useState(false)
@@ -36,6 +38,11 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
   const [chatSending, setChatSending] = useState(false)
   const [progressLoading, setProgressLoading] = useState(false)
   const [milestoneLoading, setMilestoneLoading] = useState(false)
+  const [milestoneUpdatingId, setMilestoneUpdatingId] = useState<string | null>(null)
+  const [celebratingMilestoneId, setCelebratingMilestoneId] = useState<string | null>(null)
+  const [optimisticMilestoneStatuses, setOptimisticMilestoneStatuses] = useState<Record<string, ProgressMilestone['status']>>({})
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false)
+  const [subscriptionUpdatingId, setSubscriptionUpdatingId] = useState<string | null>(null)
   const [shareLoading, setShareLoading] = useState(false)
   const [hwTitle, setHwTitle] = useState('')
   const [hwInstructions, setHwInstructions] = useState('')
@@ -49,9 +56,44 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
   const [milestoneTitle, setMilestoneTitle] = useState('')
   const [milestoneDescription, setMilestoneDescription] = useState('')
   const [milestoneTargetDate, setMilestoneTargetDate] = useState('')
+  const [subscriptionPlanName, setSubscriptionPlanName] = useState('')
+  const [subscriptionDescription, setSubscriptionDescription] = useState('')
+  const [subscriptionAmount, setSubscriptionAmount] = useState('')
+  const [subscriptionInterval, setSubscriptionInterval] = useState<MockSubscription['billing_interval']>('monthly')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const router = useRouter()
+
+  const milestoneProgress = useMemo(() => {
+    const achieved = milestones.filter((milestone) => {
+      const status = optimisticMilestoneStatuses[milestone.id] ?? milestone.status
+      return status === 'achieved'
+    }).length
+    const total = milestones.length
+
+    return {
+      achieved,
+      total,
+      percent: total > 0 ? Math.round((achieved / total) * 100) : 0,
+    }
+  }, [milestones, optimisticMilestoneStatuses])
+
+  const getMilestoneStatus = (milestone: ProgressMilestone) => {
+    return optimisticMilestoneStatuses[milestone.id] ?? milestone.status
+  }
+
+  const activeSubscriptionTotalCents = subscriptions
+    .filter((subscription) => subscription.status === 'active')
+    .reduce((sum, subscription) => sum + subscription.amount_cents, 0)
+
+  const formatSubscriptionPrice = (subscription: MockSubscription) => {
+    const amount = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: subscription.currency || 'USD',
+    }).format(subscription.amount_cents / 100)
+
+    return `${amount}/${subscription.billing_interval.replace('ly', '')}`
+  }
 
   const copyLink = () => {
     const url = `${window.location.origin}/student/${student.access_token}`
@@ -250,6 +292,95 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
     }
   }
 
+  const handleToggleMilestone = async (milestone: ProgressMilestone) => {
+    const currentStatus = getMilestoneStatus(milestone)
+    const nextStatus: ProgressMilestone['status'] = currentStatus === 'achieved' ? 'pending' : 'achieved'
+
+    setMilestoneUpdatingId(milestone.id)
+    setOptimisticMilestoneStatuses((current) => ({
+      ...current,
+      [milestone.id]: nextStatus,
+    }))
+
+    if (nextStatus === 'achieved') {
+      setCelebratingMilestoneId(milestone.id)
+      window.setTimeout(() => {
+        setCelebratingMilestoneId((current) => (current === milestone.id ? null : current))
+      }, 900)
+    }
+
+    try {
+      const result = await toggleProgressMilestoneAction(milestone.id, nextStatus === 'achieved')
+      if (result.error) throw new Error(result.error)
+
+      toast({ title: nextStatus === 'achieved' ? 'Milestone accomplished!' : 'Milestone reopened' })
+      router.refresh()
+    } catch (error: any) {
+      setOptimisticMilestoneStatuses((current) => {
+        const next = { ...current }
+        delete next[milestone.id]
+        return next
+      })
+      setCelebratingMilestoneId(null)
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setMilestoneUpdatingId(null)
+    }
+  }
+
+  const handleOfferSubscription = async () => {
+    if (!subscriptionPlanName.trim()) {
+      toast({ title: 'Plan name is required', variant: 'destructive' })
+      return
+    }
+
+    const amountDollars = Number(subscriptionAmount)
+    if (!Number.isFinite(amountDollars) || amountDollars < 0) {
+      toast({ title: 'Enter a valid amount', variant: 'destructive' })
+      return
+    }
+
+    setSubscriptionLoading(true)
+    try {
+      const result = await offerMockSubscriptionAction({
+        student_id: student.id,
+        plan_name: subscriptionPlanName,
+        description: subscriptionDescription,
+        amount_dollars: amountDollars,
+        billing_interval: subscriptionInterval,
+      })
+      if (result.error) throw new Error(result.error)
+
+      setSubscriptionPlanName('')
+      setSubscriptionDescription('')
+      setSubscriptionAmount('')
+      setSubscriptionInterval('monthly')
+      toast({ title: 'Subscription offered', description: 'The student can now buy this mock subscription.' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setSubscriptionLoading(false)
+    }
+  }
+
+  const handleCancelSubscription = async (subscription: MockSubscription) => {
+    if (!confirm('Cancel this mock subscription?')) return
+
+    setSubscriptionUpdatingId(subscription.id)
+    try {
+      const result = await cancelMockSubscriptionAction(subscription.id)
+      if (result.error) throw new Error(result.error)
+
+      toast({ title: 'Subscription cancelled' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setSubscriptionUpdatingId(null)
+    }
+  }
+
   const handleCreateShareLink = async () => {
     setShareLoading(true)
     try {
@@ -370,6 +501,10 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
           <TabsTrigger value="chat" className="gap-2">
             <MessageSquare className="w-4 h-4" />
             Chat
+          </TabsTrigger>
+          <TabsTrigger value="financials" className="gap-2">
+            <CreditCard className="w-4 h-4" />
+            Financials
           </TabsTrigger>
           <TabsTrigger value="progress" className="gap-2">
             <BarChart3 className="w-4 h-4" />
@@ -522,7 +657,7 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
           <Card>
             <CardHeader>
               <CardTitle>Chat with Student</CardTitle>
-              <CardDescription>Send messages directly inside Solo Tutor Suite.</CardDescription>
+              <CardDescription>Send messages directly inside SoloTutorSuite.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-[420px] overflow-y-auto mb-4">
@@ -569,6 +704,128 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="financials">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mock Subscription Offer</CardTitle>
+                <CardDescription>
+                  Offer a simulated subscription. No payment processor is connected.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <Label>Plan name</Label>
+                    <Input
+                      value={subscriptionPlanName}
+                      onChange={(e) => setSubscriptionPlanName(e.target.value)}
+                      placeholder="e.g., Weekly coaching plan"
+                    />
+                  </div>
+                  <div>
+                    <Label>Amount</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={subscriptionAmount}
+                      onChange={(e) => setSubscriptionAmount(e.target.value)}
+                      placeholder="150"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Billing interval</Label>
+                  <Select value={subscriptionInterval} onValueChange={(value) => setSubscriptionInterval(value as MockSubscription['billing_interval'])}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <Textarea
+                    value={subscriptionDescription}
+                    onChange={(e) => setSubscriptionDescription(e.target.value)}
+                    placeholder="What is included in this subscription?"
+                    rows={3}
+                  />
+                </div>
+                <Button onClick={handleOfferSubscription} disabled={subscriptionLoading}>
+                  {subscriptionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Offer Subscription
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Subscriptions</CardTitle>
+                <CardDescription>View and cancel this student&apos;s mock subscription history.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 rounded-lg border p-4">
+                  <p className="text-sm text-muted-foreground mb-2">Active mock subscriptions</p>
+                  <p className="text-2xl font-bold">${(activeSubscriptionTotalCents / 100).toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Simulated recurring total for this student.</p>
+                </div>
+
+                {subscriptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No subscriptions offered yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {subscriptions.map((subscription) => {
+                      const updating = subscriptionUpdatingId === subscription.id
+
+                      return (
+                        <div key={subscription.id} className="rounded-lg border p-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-medium">{subscription.plan_name}</p>
+                                <Badge variant={subscription.status === 'active' ? 'success' : subscription.status === 'offered' ? 'secondary' : 'outline'}>
+                                  {subscription.status}
+                                </Badge>
+                              </div>
+                              {subscription.description && (
+                                <p className="text-sm text-muted-foreground mt-1">{subscription.description}</p>
+                              )}
+                              <p className="text-sm font-semibold mt-2">{formatSubscriptionPrice(subscription)}</p>
+                              {subscription.started_at && (
+                                <p className="text-xs text-muted-foreground mt-1">Started {formatDate(subscription.started_at)}</p>
+                              )}
+                              {subscription.cancelled_at && (
+                                <p className="text-xs text-muted-foreground mt-1">Cancelled {formatDate(subscription.cancelled_at)}</p>
+                              )}
+                            </div>
+                            {subscription.status !== 'cancelled' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCancelSubscription(subscription)}
+                                disabled={updating}
+                              >
+                                {updating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                Cancel
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="progress">
@@ -665,6 +922,31 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
                 <CardTitle>Progress Milestones</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {milestones.length > 0 && (
+                  <div className="space-y-3 pb-2">
+                    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Milestone Progress</p>
+                        <p className="text-xs text-muted-foreground">
+                          {milestoneProgress.achieved} of {milestoneProgress.total} accomplished
+                        </p>
+                      </div>
+                      <Badge variant={milestoneProgress.percent === 100 ? 'success' : 'secondary'}>
+                        {milestoneProgress.percent}%
+                      </Badge>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className={cn(
+                          'h-full rounded-full bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500 transition-all duration-700',
+                          celebratingMilestoneId && 'progress-fill-celebrate'
+                        )}
+                        style={{ width: `${milestoneProgress.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid md:grid-cols-2 gap-3">
                   <div>
                     <Label>Milestone title</Label>
@@ -687,15 +969,47 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
                   {milestones.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No milestones yet.</p>
                   ) : (
-                    milestones.map((m) => (
-                      <div key={m.id} className="p-3 bg-gray-50 rounded-lg flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium">{m.title}</p>
-                          {m.description && <p className="text-sm text-muted-foreground mt-1">{m.description}</p>}
+                    milestones.map((m) => {
+                      const status = getMilestoneStatus(m)
+                      const achieved = status === 'achieved'
+                      const updating = milestoneUpdatingId === m.id
+
+                      return (
+                        <div
+                          key={m.id}
+                          className={cn(
+                            'relative flex flex-col gap-3 overflow-hidden rounded-lg border p-3 transition-all sm:flex-row sm:items-start sm:justify-between',
+                            achieved ? 'border-green-200 bg-green-50/70' : 'border-transparent bg-gray-50',
+                            celebratingMilestoneId === m.id && 'milestone-achieved'
+                          )}
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">{m.title}</p>
+                              {m.target_date && <Badge variant="outline">Target {formatDate(m.target_date)}</Badge>}
+                            </div>
+                            {m.description && <p className="text-sm text-muted-foreground mt-1">{m.description}</p>}
+                          </div>
+                          <div className="flex flex-shrink-0 items-center gap-2">
+                            <Badge variant={achieved ? 'success' : 'secondary'}>{achieved ? 'achieved' : status}</Badge>
+                            <Button
+                              size="sm"
+                              variant={achieved ? 'outline' : 'default'}
+                              className="gap-2"
+                              onClick={() => handleToggleMilestone(m)}
+                              disabled={updating}
+                            >
+                              {updating ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-4 w-4" />
+                              )}
+                              {achieved ? 'Reopen' : 'Mark Done'}
+                            </Button>
+                          </div>
                         </div>
-                        <Badge variant={m.status === 'achieved' ? 'success' : 'secondary'}>{m.status}</Badge>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
               </CardContent>

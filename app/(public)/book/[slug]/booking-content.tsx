@@ -2,13 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { AppLogo } from '@/components/app-logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/use-toast'
-import { Sparkles, Calendar, Clock, CheckCircle, Loader2, ArrowLeft } from 'lucide-react'
+import { Calendar, Clock, CheckCircle, Loader2, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AvailabilityRule, Booking } from '@/lib/types'
 import { createBookingAction } from './actions'
@@ -198,12 +199,7 @@ export function BookingContent({ slug, tutorName, tutorId, rules, existingBookin
             <ArrowLeft className="w-4 h-4" />
             Back to profile
           </Link>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold">Solo Tutor Suite</span>
-          </div>
+          <AppLogo href="/" size="sm" textClassName="text-base" />
         </div>
       </header>
 

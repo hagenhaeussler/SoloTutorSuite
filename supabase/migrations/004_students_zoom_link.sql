@@ -1,4 +1,4 @@
--- Solo Tutor Suite: student video call links
+-- SoloTutorSuite: student video call links
 -- Adds a per-student Zoom meeting link for tutor/student portal join buttons.
 
 ALTER TABLE students

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { AppLogo } from '@/components/app-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { 
@@ -19,12 +20,7 @@ export default function LandingPage() {
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-xl">Solo Tutor Suite</span>
-          </div>
+          <AppLogo href="/" size="sm" textClassName="text-xl" priority />
           <Link href="/login">
             <Button>Sign In</Button>
           </Link>
@@ -142,7 +138,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="container mx-auto px-4 text-center text-gray-600">
-          <p>© 2024 Solo Tutor Suite. Built to help tutors succeed.</p>
+          <p>© 2024 SoloTutorSuite. Built to help tutors succeed.</p>
         </div>
       </footer>
     </div>
