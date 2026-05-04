@@ -121,6 +121,7 @@ export default async function StudentAppPage({ searchParams }: StudentAppPagePro
     const tutor = tutorMap.get(connection.user_id)
     return {
       id: connection.id,
+      user_id: connection.user_id,
       name: connection.name,
       email: connection.email,
       zoom_meeting_link: connection.zoom_meeting_link,
@@ -133,6 +134,7 @@ export default async function StudentAppPage({ searchParams }: StudentAppPagePro
     const tutor = tutorMap.get(connection.user_id)
     return {
       id: connection.id,
+      user_id: connection.user_id,
       name: connection.name,
       email: connection.email,
       zoom_meeting_link: connection.zoom_meeting_link,

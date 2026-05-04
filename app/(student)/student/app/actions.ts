@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { appCalendarEventSchema, chatMessageSchema, type AppCalendarEventInput } from '@/lib/validations'
 import { GoogleCalendarConnectionError } from '@/lib/google-calendar/client'
@@ -58,6 +59,7 @@ export async function submitHomeworkByAuthAction(formData: FormData) {
 
     if (dbError) throw dbError
 
+    revalidatePath('/student/app')
     return { success: true }
   } catch (error: any) {
     console.error('Error submitting homework (student auth):', error)
@@ -99,6 +101,7 @@ export async function sendStudentChatMessageAction(studentId: string, messageInp
 
     if (error) throw error
 
+    revalidatePath('/student/app')
     return { success: true }
   } catch (error: any) {
     console.error('Error sending student chat message:', error)
@@ -145,6 +148,7 @@ export async function toggleStudentMilestoneAction(milestoneId: string, achieved
 
     if (error) throw error
 
+    revalidatePath('/student/app')
     return { success: true }
   } catch (error: any) {
     console.error('Error toggling student milestone:', error)
@@ -192,6 +196,7 @@ export async function buyMockSubscriptionAction(subscriptionId: string) {
 
     if (error) throw error
 
+    revalidatePath('/student/app')
     return { success: true }
   } catch (error: any) {
     console.error('Error buying mock subscription:', error)
@@ -238,6 +243,7 @@ export async function cancelStudentMockSubscriptionAction(subscriptionId: string
 
     if (error) throw error
 
+    revalidatePath('/student/app')
     return { success: true }
   } catch (error: any) {
     console.error('Error cancelling student mock subscription:', error)
@@ -283,7 +289,7 @@ export async function createStudentCalendarEventAction(data: AppCalendarEventInp
         created_by_role: 'student',
         google_sync_status: 'not_synced',
       })
-      .select('id, title, description, location, start_ts, end_ts, event_type')
+      .select('*')
       .single()
 
     if (error) throw error
@@ -324,7 +330,15 @@ export async function createStudentCalendarEventAction(data: AppCalendarEventInp
       }
     }
 
-    return { success: true, warning }
+    const { data: savedEvent } = await service
+      .from('calendar_events')
+      .select('*')
+      .eq('id', event.id)
+      .eq('user_id', user.id)
+      .single()
+
+    revalidatePath('/student/app')
+    return { success: true, warning, event: savedEvent || event }
   } catch (error: any) {
     console.error('Error creating student calendar event:', error)
     return { error: error.message || 'Failed to create calendar event' }
@@ -352,7 +366,7 @@ export async function acceptTutorInvitationAction(studentId: string) {
     const normalizedProfileEmail = normalizeEmail(profile.email)
     const { data: student } = await service
       .from('students')
-      .select('id, email, auth_user_id, invitation_status')
+      .select('id, user_id, name, email, zoom_meeting_link, auth_user_id, invitation_status')
       .eq('id', studentId)
       .single()
 
@@ -366,7 +380,7 @@ export async function acceptTutorInvitationAction(studentId: string) {
       return { error: 'Invitation not found for this student account' }
     }
 
-    const { error } = await service
+    const { data: acceptedStudent, error } = await service
       .from('students')
       .update({
         auth_user_id: user.id,
@@ -375,10 +389,34 @@ export async function acceptTutorInvitationAction(studentId: string) {
         declined_at: null,
       })
       .eq('id', student.id)
+      .select('id, user_id, name, email, zoom_meeting_link, auth_user_id, invitation_status')
+      .single()
 
     if (error) throw error
 
-    return { success: true }
+    if (!acceptedStudent || acceptedStudent.auth_user_id !== user.id || acceptedStudent.invitation_status !== 'active') {
+      return { error: 'Invitation update did not activate this tutor workspace. Please refresh and try again.' }
+    }
+
+    const { data: tutor } = await service
+      .from('profiles')
+      .select('id, name, email')
+      .eq('id', acceptedStudent.user_id)
+      .single()
+
+    revalidatePath('/student/app')
+    return {
+      success: true,
+      connection: {
+        id: acceptedStudent.id,
+        user_id: acceptedStudent.user_id,
+        name: acceptedStudent.name,
+        email: acceptedStudent.email,
+        zoom_meeting_link: acceptedStudent.zoom_meeting_link,
+        tutorName: tutor?.name || 'Tutor',
+        tutorEmail: tutor?.email || null,
+      },
+    }
   } catch (error: any) {
     console.error('Error accepting tutor invitation:', error)
     return { error: error.message || 'Failed to accept invitation' }
@@ -420,7 +458,7 @@ export async function declineTutorInvitationAction(studentId: string) {
       return { error: 'Invitation not found for this student account' }
     }
 
-    const { error } = await service
+    const { data: declinedStudent, error } = await service
       .from('students')
       .update({
         auth_user_id: user.id,
@@ -428,9 +466,16 @@ export async function declineTutorInvitationAction(studentId: string) {
         declined_at: new Date().toISOString(),
       })
       .eq('id', student.id)
+      .select('id, auth_user_id, invitation_status')
+      .single()
 
     if (error) throw error
 
+    if (!declinedStudent || declinedStudent.auth_user_id !== user.id || declinedStudent.invitation_status !== 'declined') {
+      return { error: 'Invitation update did not save. Please refresh and try again.' }
+    }
+
+    revalidatePath('/student/app')
     return { success: true }
   } catch (error: any) {
     console.error('Error declining tutor invitation:', error)

@@ -26,6 +26,8 @@ import {
   Video,
   LogOut,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Link2,
   Plus,
   RefreshCw,
@@ -46,7 +48,7 @@ import {
   toggleStudentMilestoneAction,
 } from './actions'
 
-type StudentConnection = Pick<Student, 'id' | 'name' | 'email' | 'zoom_meeting_link'> & {
+type StudentConnection = Pick<Student, 'id' | 'user_id' | 'name' | 'email' | 'zoom_meeting_link'> & {
   tutorName: string
   tutorEmail: string | null
 }
@@ -64,6 +66,8 @@ type StudentBooking = {
   prospect_email: string
   status: 'confirmed' | 'cancelled'
 }
+
+const padTime = (value: number) => value.toString().padStart(2, '0')
 
 const toDateInputValue = (date: Date | string) => {
   const value = new Date(date)
@@ -92,6 +96,73 @@ const getRangeIso = (startDate: string, endDate: string) => {
   }
 
   return { timeMin: start.toISOString(), timeMax: end.toISOString() }
+}
+
+const toDateKey = (date: Date | string) => {
+  const value = new Date(date)
+
+  if (Number.isNaN(value.getTime())) return ''
+
+  return [
+    value.getFullYear(),
+    padTime(value.getMonth() + 1),
+    padTime(value.getDate()),
+  ].join('-')
+}
+
+const getMonthGridRange = (monthDate: Date) => {
+  const start = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 0, 0, 0, 0)
+  start.setDate(start.getDate() - start.getDay())
+
+  const end = new Date(start)
+  end.setDate(start.getDate() + 41)
+  end.setHours(23, 59, 59, 999)
+
+  return { start, end }
+}
+
+const getMonthDays = (monthDate: Date) => {
+  const { start } = getMonthGridRange(monthDate)
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(start)
+    day.setDate(start.getDate() + index)
+    return day
+  })
+}
+
+const formatMonthLabel = (date: Date) =>
+  date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+const formatSelectedDayLabel = (dateKey: string) => {
+  const date = new Date(`${dateKey}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return 'Selected day'
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
+const formatEventTimeRange = (start: string, end: string) => {
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return ''
+  }
+
+  return `${startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+const getEventSourceClassName = (source: UnifiedCalendarEvent['source']) => {
+  if (source === 'google') return 'border-amber-300 bg-amber-50 text-amber-950'
+  if (source === 'booking') return 'border-blue-300 bg-blue-50 text-blue-950'
+  if (source === 'homework') return 'border-purple-300 bg-purple-50 text-purple-950'
+  return 'border-emerald-300 bg-emerald-50 text-emerald-950'
+}
+
+const getEventSourceDotClassName = (source: UnifiedCalendarEvent['source']) => {
+  if (source === 'google') return 'bg-amber-500'
+  if (source === 'booking') return 'bg-blue-500'
+  if (source === 'homework') return 'bg-purple-500'
+  return 'bg-emerald-500'
 }
 
 interface StudentAppContentProps {
@@ -141,6 +212,12 @@ export function StudentAppContent({
 }: StudentAppContentProps) {
   const defaultEventStart = new Date(Date.now() + 60 * 60 * 1000)
   const defaultEventEnd = new Date(defaultEventStart.getTime() + 60 * 60 * 1000)
+  const [connectionItems, setConnectionItems] = useState(connections)
+  const [pendingInvitationItems, setPendingInvitationItems] = useState(pendingInvitations)
+  const [resolvedInvitationIds, setResolvedInvitationIds] = useState<string[]>([])
+  const [calendarEventItems, setCalendarEventItems] = useState(calendarEvents)
+  const [chatMessageItems, setChatMessageItems] = useState(chatMessages)
+  const [subscriptionItems, setSubscriptionItems] = useState(subscriptions)
   const [selectedStudentId, setSelectedStudentId] = useState(connections[0]?.id || '')
   const [uploadingHomeworkId, setUploadingHomeworkId] = useState<string | null>(null)
   const [chatText, setChatText] = useState('')
@@ -154,6 +231,11 @@ export function StudentAppContent({
   const [syncingGoogle, setSyncingGoogle] = useState(false)
   const [googleCalendarEvents, setGoogleCalendarEvents] = useState(googleEvents)
   const [googleCalendarWarning, setGoogleCalendarWarning] = useState<string | null>(googleWarning)
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const today = new Date()
+    return new Date(today.getFullYear(), today.getMonth(), 1)
+  })
+  const [selectedDateKey, setSelectedDateKey] = useState(toDateKey(new Date()))
   const [rangeStart, setRangeStart] = useState(toDateInputValue(initialRangeStart))
   const [rangeEnd, setRangeEnd] = useState(toDateInputValue(initialRangeEnd))
   const [newCalendarEvent, setNewCalendarEvent] = useState({
@@ -204,6 +286,44 @@ export function StudentAppContent({
   }, [googleCalendarReason, googleCalendarStatus, googleCalendarWarning, googleConnected, googleConnection?.google_email, googleConnection?.connection_status])
 
   useEffect(() => {
+    setConnectionItems((current) => {
+      const merged = new Map(current.map((connection) => [connection.id, connection]))
+      connections.forEach((connection) => merged.set(connection.id, connection))
+      return Array.from(merged.values())
+    })
+  }, [connections])
+
+  useEffect(() => {
+    setPendingInvitationItems(pendingInvitations.filter((invitation) => !resolvedInvitationIds.includes(invitation.id)))
+  }, [pendingInvitations, resolvedInvitationIds])
+
+  useEffect(() => {
+    setCalendarEventItems(calendarEvents)
+  }, [calendarEvents])
+
+  useEffect(() => {
+    setChatMessageItems(chatMessages)
+  }, [chatMessages])
+
+  useEffect(() => {
+    setSubscriptionItems(subscriptions)
+  }, [subscriptions])
+
+  useEffect(() => {
+    setGoogleCalendarEvents(googleEvents)
+    setGoogleCalendarWarning(googleWarning)
+  }, [googleEvents, googleWarning])
+
+  useEffect(() => {
+    if (!googleConnected) return
+
+    setNewCalendarEvent((current) => ({
+      ...current,
+      add_to_google_calendar: true,
+    }))
+  }, [googleConnected])
+
+  useEffect(() => {
     if (!googleStatusMessage) return
 
     toast({
@@ -224,17 +344,17 @@ export function StudentAppContent({
   }, [googleCalendarWarning, toast])
 
   useEffect(() => {
-    if (connections.length === 0) return
+    if (connectionItems.length === 0) return
 
-    const selectedStillExists = connections.some((connection) => connection.id === selectedStudentId)
+    const selectedStillExists = connectionItems.some((connection) => connection.id === selectedStudentId)
     if (!selectedStudentId || !selectedStillExists) {
-      setSelectedStudentId(connections[0].id)
+      setSelectedStudentId(connectionItems[0].id)
     }
-  }, [connections, selectedStudentId])
+  }, [connectionItems, selectedStudentId])
 
   const selectedConnection = useMemo(
-    () => connections.find((c) => c.id === selectedStudentId) || null,
-    [connections, selectedStudentId]
+    () => connectionItems.find((c) => c.id === selectedStudentId) || null,
+    [connectionItems, selectedStudentId]
   )
 
   const filteredHomework = useMemo(
@@ -253,8 +373,8 @@ export function StudentAppContent({
   )
 
   const filteredChat = useMemo(
-    () => chatMessages.filter((m) => m.student_id === selectedStudentId),
-    [chatMessages, selectedStudentId]
+    () => chatMessageItems.filter((m) => m.student_id === selectedStudentId),
+    [chatMessageItems, selectedStudentId]
   )
 
   const filteredBookings = useMemo(() => {
@@ -265,7 +385,7 @@ export function StudentAppContent({
 
     return bookings.filter((b) => {
       const bookingEmail = b.prospect_email.toLowerCase()
-      return bookingEmail === connectionEmail || bookingEmail === profileEmail
+      return b.user_id === selectedConnection.user_id && (bookingEmail === connectionEmail || bookingEmail === profileEmail)
     })
   }, [bookings, selectedConnection, studentEmail])
 
@@ -280,17 +400,17 @@ export function StudentAppContent({
   )
 
   const filteredSubscriptions = useMemo(
-    () => subscriptions.filter((subscription) => subscription.student_id === selectedStudentId),
-    [subscriptions, selectedStudentId]
+    () => subscriptionItems.filter((subscription) => subscription.student_id === selectedStudentId),
+    [subscriptionItems, selectedStudentId]
   )
 
   const filteredCalendarEvents = useMemo(
     () =>
-      calendarEvents.filter((event) => {
+      calendarEventItems.filter((event) => {
         if (!selectedStudentId) return event.created_by_role === 'student'
         return event.student_id === selectedStudentId || event.student_id === null || event.created_by_role === 'student'
       }),
-    [calendarEvents, selectedStudentId]
+    [calendarEventItems, selectedStudentId]
   )
 
   const unifiedCalendarEvents = useMemo<UnifiedCalendarEvent[]>(() => {
@@ -351,6 +471,25 @@ export function StudentAppContent({
       (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
     )
   }, [filteredBookings, filteredCalendarEvents, filteredHomework, googleCalendarEvents, selectedConnection?.tutorName])
+
+  const monthDays = useMemo(() => getMonthDays(visibleMonth), [visibleMonth])
+  const eventsByDate = useMemo(() => {
+    const { start, end } = getMonthGridRange(visibleMonth)
+    const grouped = new Map<string, UnifiedCalendarEvent[]>()
+
+    unifiedCalendarEvents.forEach((event) => {
+      const startDate = new Date(event.start)
+      if (Number.isNaN(startDate.getTime()) || startDate < start || startDate > end) return
+
+      const key = toDateKey(startDate)
+      const existing = grouped.get(key) || []
+      existing.push(event)
+      grouped.set(key, existing)
+    })
+
+    return grouped
+  }, [unifiedCalendarEvents, visibleMonth])
+  const selectedDayEvents = eventsByDate.get(selectedDateKey) || []
 
   const milestoneProgress = useMemo(() => {
     const achieved = filteredMilestones.filter((m) => {
@@ -417,15 +556,32 @@ export function StudentAppContent({
   }
 
   const handleSendMessage = async () => {
-    if (!selectedStudentId || !chatText.trim()) return
+    const message = chatText.trim()
+    if (!selectedStudentId || !selectedConnection || !message) return
 
+    const optimisticId = `local:${Date.now()}`
     setChatSending(true)
+    setChatText('')
+    setChatMessageItems((current) => [
+      ...current,
+      {
+        id: optimisticId,
+        tutor_user_id: selectedConnection.user_id,
+        student_id: selectedStudentId,
+        sender_type: 'student',
+        sender_user_id: null,
+        message,
+        read_at: null,
+        created_at: new Date().toISOString(),
+      },
+    ])
     try {
-      const result = await sendStudentChatMessageAction(selectedStudentId, chatText)
+      const result = await sendStudentChatMessageAction(selectedStudentId, message)
       if (result.error) throw new Error(result.error)
-      setChatText('')
       router.refresh()
     } catch (error: any) {
+      setChatMessageItems((current) => current.filter((item) => item.id !== optimisticId))
+      setChatText(message)
       toast({ title: 'Error', description: error.message, variant: 'destructive' })
     } finally {
       setChatSending(false)
@@ -474,6 +630,13 @@ export function StudentAppContent({
       const result = await buyMockSubscriptionAction(subscription.id)
       if (result.error) throw new Error(result.error)
 
+      setSubscriptionItems((current) =>
+        current.map((item) =>
+          item.id === subscription.id
+            ? { ...item, status: 'active', started_at: new Date().toISOString(), cancelled_at: null }
+            : item
+        )
+      )
       toast({ title: 'Subscription started!', description: 'This mock purchase is now active.' })
       router.refresh()
     } catch (error: any) {
@@ -491,6 +654,13 @@ export function StudentAppContent({
       const result = await cancelStudentMockSubscriptionAction(subscription.id)
       if (result.error) throw new Error(result.error)
 
+      setSubscriptionItems((current) =>
+        current.map((item) =>
+          item.id === subscription.id
+            ? { ...item, status: 'cancelled', cancelled_at: new Date().toISOString() }
+            : item
+        )
+      )
       toast({ title: 'Subscription cancelled' })
       router.refresh()
     } catch (error: any) {
@@ -503,8 +673,20 @@ export function StudentAppContent({
   const handleAcceptInvitation = async (studentId: string) => {
     setInvitationUpdatingId(studentId)
     try {
+      const invitation = pendingInvitationItems.find((item) => item.id === studentId)
       const result = await acceptTutorInvitationAction(studentId)
       if (result.error) throw new Error(result.error)
+
+      const activatedConnection = (result as { connection?: StudentConnection }).connection || invitation
+      if (activatedConnection) {
+        setResolvedInvitationIds((current) => Array.from(new Set([...current, studentId])))
+        setPendingInvitationItems((current) => current.filter((item) => item.id !== studentId))
+        setConnectionItems((current) => {
+          const withoutDuplicate = current.filter((item) => item.id !== activatedConnection.id)
+          return [activatedConnection, ...withoutDuplicate]
+        })
+        setSelectedStudentId(activatedConnection.id)
+      }
 
       toast({ title: 'Invitation accepted', description: 'Your tutor workspace is now available.' })
       router.refresh()
@@ -523,6 +705,8 @@ export function StudentAppContent({
       const result = await declineTutorInvitationAction(studentId)
       if (result.error) throw new Error(result.error)
 
+      setResolvedInvitationIds((current) => Array.from(new Set([...current, studentId])))
+      setPendingInvitationItems((current) => current.filter((item) => item.id !== studentId))
       toast({ title: 'Invitation declined' })
       router.refresh()
     } catch (error: any) {
@@ -569,6 +753,18 @@ export function StudentAppContent({
 
       if (result.error) throw new Error(result.error)
 
+      const createdEvent = (result as { event?: CalendarEvent }).event
+      if (createdEvent) {
+        setCalendarEventItems((current) => {
+          const withoutDuplicate = current.filter((event) => event.id !== createdEvent.id)
+          return [...withoutDuplicate, createdEvent].sort(
+            (a, b) => new Date(a.start_ts).getTime() - new Date(b.start_ts).getTime()
+          )
+        })
+        setSelectedDateKey(toDateKey(createdEvent.start_ts))
+        setVisibleMonth(new Date(new Date(createdEvent.start_ts).getFullYear(), new Date(createdEvent.start_ts).getMonth(), 1))
+      }
+
       toast({
         title: result.warning ? 'Calendar event created with Google warning' : 'Calendar event created',
         description: result.warning || undefined,
@@ -588,6 +784,31 @@ export function StudentAppContent({
     } finally {
       setCreatingCalendarEvent(false)
     }
+  }
+
+  const updateVisibleMonth = (month: Date) => {
+    const normalizedMonth = new Date(month.getFullYear(), month.getMonth(), 1)
+    const { start, end } = getMonthGridRange(normalizedMonth)
+
+    setVisibleMonth(normalizedMonth)
+    setSelectedDateKey(toDateKey(normalizedMonth))
+    setRangeStart(toDateInputValue(start))
+    setRangeEnd(toDateInputValue(end))
+  }
+
+  const handleChangeMonth = (offset: number) => {
+    updateVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + offset, 1))
+  }
+
+  const handleTodayCalendar = () => {
+    const today = new Date()
+    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    const { start, end } = getMonthGridRange(currentMonth)
+
+    setVisibleMonth(currentMonth)
+    setSelectedDateKey(toDateKey(today))
+    setRangeStart(toDateInputValue(start))
+    setRangeEnd(toDateInputValue(end))
   }
 
   const handleSyncGoogleEvents = async () => {
@@ -782,7 +1003,7 @@ export function StudentAppContent({
           </CardContent>
         </Card>
 
-        {pendingInvitations.length > 0 && (
+        {pendingInvitationItems.length > 0 && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Tutor Invitations</CardTitle>
@@ -792,7 +1013,7 @@ export function StudentAppContent({
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {pendingInvitations.map((invitation) => {
+                {pendingInvitationItems.map((invitation) => {
                   const updating = invitationUpdatingId === invitation.id
 
                   return (
@@ -828,7 +1049,7 @@ export function StudentAppContent({
           </Card>
         )}
 
-        {connections.length === 0 ? (
+        {connectionItems.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center">
               <h2 className="text-xl font-semibold mb-2">Student account ready</h2>
@@ -847,7 +1068,7 @@ export function StudentAppContent({
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {connections.map((connection) => (
+                  {connectionItems.map((connection) => (
                     <Button
                       key={connection.id}
                       variant={selectedStudentId === connection.id ? 'default' : 'outline'}
@@ -1069,50 +1290,179 @@ export function StudentAppContent({
 
                   <Card>
                     <CardHeader>
-                      <CardTitle>Calendar</CardTitle>
-                      <CardDescription>Bookings, homework due dates, SoloTutorSuite events, and Google events.</CardDescription>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <CardTitle>Calendar</CardTitle>
+                          <CardDescription>Classes, bookings, homework due dates, SoloTutorSuite events, and Google events.</CardDescription>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" onClick={handleTodayCalendar} disabled={syncingGoogle}>
+                            Today
+                          </Button>
+                          <div className="inline-flex overflow-hidden rounded-md border">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="rounded-none"
+                              onClick={() => handleChangeMonth(-1)}
+                              disabled={syncingGoogle}
+                              aria-label="Previous month"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="rounded-none"
+                              onClick={() => handleChangeMonth(1)}
+                              disabled={syncingGoogle}
+                              aria-label="Next month"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <Button onClick={handleSyncGoogleEvents} disabled={syncingGoogle} variant={googleConnected ? 'default' : 'outline'}>
+                            {syncingGoogle ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                            {googleConnected ? 'Sync Visible Calendar' : 'Refresh Calendar'}
+                          </Button>
+                        </div>
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      {unifiedCalendarEvents.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-8">No calendar events in this range yet.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {unifiedCalendarEvents.map((event) => (
-                            <div key={event.id} className="rounded-lg border p-3">
-                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="min-w-0">
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <h2 className="text-lg font-semibold">{formatMonthLabel(visibleMonth)}</h2>
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          {[
+                            { source: 'app' as const, label: 'SoloTutorSuite' },
+                            { source: 'booking' as const, label: 'Bookings' },
+                            { source: 'homework' as const, label: 'Homework' },
+                            { source: 'google' as const, label: 'Google' },
+                          ].map((item) => (
+                            <span key={item.source} className="inline-flex items-center gap-1.5">
+                              <span className={cn('h-2.5 w-2.5 rounded-full', getEventSourceDotClassName(item.source))} />
+                              {item.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                        <div className="overflow-x-auto rounded-lg border">
+                          <div className="min-w-[760px]">
+                            <div className="grid grid-cols-7 border-b bg-gray-50">
+                              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                                <div key={day} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  {day}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="grid grid-cols-7">
+                              {monthDays.map((day) => {
+                                const dayKey = toDateKey(day)
+                                const dayEvents = eventsByDate.get(dayKey) || []
+                                const isCurrentMonth = day.getMonth() === visibleMonth.getMonth()
+                                const isSelected = dayKey === selectedDateKey
+                                const isToday = dayKey === toDateKey(new Date())
+
+                                return (
+                                  <button
+                                    key={dayKey}
+                                    type="button"
+                                    onClick={() => setSelectedDateKey(dayKey)}
+                                    aria-pressed={isSelected}
+                                    className={cn(
+                                      'min-h-[132px] border-b border-r p-2 text-left align-top transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset',
+                                      !isCurrentMonth && 'bg-gray-50/70 text-muted-foreground',
+                                      isSelected && 'bg-blue-50',
+                                      isToday && 'shadow-[inset_0_0_0_2px_rgba(37,99,235,0.55)]'
+                                    )}
+                                  >
+                                    <div className="mb-2 flex items-center justify-between">
+                                      <span className={cn('text-sm font-semibold', isToday && 'text-blue-700')}>
+                                        {day.getDate()}
+                                      </span>
+                                      {dayEvents.length > 0 && (
+                                        <span className="rounded-full bg-gray-900 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                          {dayEvents.length}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="space-y-1">
+                                      {dayEvents.slice(0, 3).map((event) => (
+                                        <div
+                                          key={event.id}
+                                          className={cn(
+                                            'min-h-7 rounded border px-2 py-1 text-xs leading-tight',
+                                            getEventSourceClassName(event.source)
+                                          )}
+                                        >
+                                          <div className="truncate font-semibold">{event.title}</div>
+                                          <div className="truncate opacity-80">{formatEventTimeRange(event.start, event.end)}</div>
+                                        </div>
+                                      ))}
+                                      {dayEvents.length > 3 && (
+                                        <div className="text-xs font-medium text-muted-foreground">
+                                          +{dayEvents.length - 3} more
+                                        </div>
+                                      )}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border p-4">
+                          <div className="mb-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              Selected Day
+                            </p>
+                            <h3 className="text-lg font-semibold">{formatSelectedDayLabel(selectedDateKey)}</h3>
+                          </div>
+
+                          {selectedDayEvents.length === 0 ? (
+                            <p className="py-10 text-center text-sm text-muted-foreground">
+                              No events on this day.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              {selectedDayEvents.map((event) => (
+                                <div key={event.id} className={cn('rounded-lg border p-3', getEventSourceClassName(event.source))}>
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <p className="font-medium">{event.title}</p>
+                                    <p className="min-w-0 flex-1 font-semibold">{event.title}</p>
                                     <Badge variant={event.source === 'google' ? 'outline' : 'secondary'}>
                                       {event.sourceLabel}
                                     </Badge>
-                                    {event.googleSyncStatus === 'failed' && (
-                                      <Badge variant="destructive">Google sync failed</Badge>
-                                    )}
                                   </div>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    {formatDateTime(event.start)} - {formatDateTime(event.end)}
+                                  <p className="mt-1 text-sm opacity-80">
+                                    {formatEventTimeRange(event.start, event.end)}
                                   </p>
                                   {event.location && (
-                                    <p className="text-sm text-muted-foreground mt-1">{event.location}</p>
+                                    <p className="mt-1 text-sm opacity-80">{event.location}</p>
                                   )}
                                   {event.description && (
-                                    <p className="text-sm mt-2">{event.description}</p>
+                                    <p className="mt-2 text-sm">{event.description}</p>
+                                  )}
+                                  {event.googleSyncStatus === 'failed' && (
+                                    <Badge variant="destructive" className="mt-3">Google sync failed</Badge>
+                                  )}
+                                  {event.htmlLink && (
+                                    <div className="mt-3">
+                                      <Button variant="outline" size="sm" asChild>
+                                        <a href={event.htmlLink} target="_blank" rel="noopener noreferrer">
+                                          <ExternalLink className="mr-2 h-4 w-4" />
+                                          Open
+                                        </a>
+                                      </Button>
+                                    </div>
                                   )}
                                 </div>
-                                {event.htmlLink && (
-                                  <Button variant="ghost" size="sm" asChild>
-                                    <a href={event.htmlLink} target="_blank" rel="noopener noreferrer">
-                                      <ExternalLink className="mr-2 h-4 w-4" />
-                                      Open
-                                    </a>
-                                  </Button>
-                                )}
-                              </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
