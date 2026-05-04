@@ -4,6 +4,7 @@ import { getGoogleOAuthClient } from '@/lib/google-calendar/oauth'
 import { decryptToken } from '@/lib/google-calendar/token-crypto'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST() {
   try {

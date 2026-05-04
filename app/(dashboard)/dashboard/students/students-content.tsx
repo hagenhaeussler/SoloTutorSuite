@@ -118,6 +118,8 @@ export function StudentsContent({ students }: StudentsContentProps) {
         toast({ title: 'Already connected', description: 'That student is already active in your Students Hub.' })
       } else if (result.linkedExisting) {
         toast({ title: 'Invitation sent!', description: 'Your existing student profile is now waiting for the student to accept.' })
+      } else if (result.needsSignup) {
+        toast({ title: 'Invitation saved', description: 'Send the signup link. The student will see this invitation after signing in with that exact email.' })
       } else {
         toast({ title: 'Invitation sent!', description: 'The student will see it when they sign in with that Google account.' })
       }

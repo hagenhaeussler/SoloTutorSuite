@@ -182,16 +182,77 @@ export async function inviteStudentByEmailAction(data: StudentEmailInviteInput) 
     const { email } = studentEmailInviteSchema.parse(data)
     const normalizedEmail = email.trim().toLowerCase()
 
-    const { data: studentProfile } = await service
+    const { data: matchingProfiles, error: profileLookupError } = await service
       .from('profiles')
       .select('id, name, email, role')
       .ilike('email', normalizedEmail)
-      .maybeSingle()
+      .limit(2)
 
-    if (!studentProfile || studentProfile.role !== 'student') {
+    if (profileLookupError) {
+      throw profileLookupError
+    }
+
+    const exactProfiles = (matchingProfiles || []).filter(
+      (profile) => profile.email?.trim().toLowerCase() === normalizedEmail
+    )
+    const studentProfile = exactProfiles.find((profile) => profile.role === 'student') || null
+    const nonStudentProfile = exactProfiles.find((profile) => profile.role !== 'student') || null
+
+    if (!studentProfile && nonStudentProfile) {
       return {
-        error: 'No student account was found for that email. Ask the student to sign up with Google first, then invite that exact email.',
+        error: 'That email is already registered as a tutor account. The student needs to use a different Google account for student access.',
       }
+    }
+
+    if (!studentProfile) {
+      const { data: tutorStudents, error: studentsError } = await service
+        .from('students')
+        .select('id, email, auth_user_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+
+      if (studentsError) throw studentsError
+
+      const matchingStudents = (tutorStudents || []).filter(
+        (student) => student.email?.trim().toLowerCase() === normalizedEmail
+      )
+      const linkedStudent = matchingStudents.find((student) => student.auth_user_id)
+      const unlinkedStudent = matchingStudents.find((student) => !student.auth_user_id)
+
+      if (linkedStudent) {
+        return {
+          error: 'A student profile with that email is already linked to another account.',
+        }
+      }
+
+      if (unlinkedStudent) {
+        const { error: updateError } = await service
+          .from('students')
+          .update({
+            invitation_status: 'pending',
+            invited_at: new Date().toISOString(),
+            declined_at: null,
+          })
+          .eq('id', unlinkedStudent.id)
+          .eq('user_id', user.id)
+
+        if (updateError) throw updateError
+        return { success: true, invited: true, needsSignup: true }
+      }
+
+      const fallbackName = normalizedEmail.split('@')[0] || 'Student'
+      const { error: insertError } = await service.from('students').insert({
+        user_id: user.id,
+        auth_user_id: null,
+        name: fallbackName,
+        email: normalizedEmail,
+        invitation_status: 'pending',
+        invited_at: new Date().toISOString(),
+      })
+
+      if (insertError) throw insertError
+
+      return { success: true, invited: true, needsSignup: true }
     }
 
     const { data: existing } = await service

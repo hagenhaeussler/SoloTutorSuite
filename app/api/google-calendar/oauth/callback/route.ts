@@ -10,6 +10,7 @@ import {
 import { encryptToken } from '@/lib/google-calendar/token-crypto'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 async function getGoogleEmailFromTokens(oauthClient: ReturnType<typeof getGoogleOAuthClient>, idToken?: string | null) {
   if (idToken) {

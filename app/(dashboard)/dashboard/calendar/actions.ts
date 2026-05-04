@@ -3,7 +3,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { availabilityRuleSchema, appCalendarEventSchema, type AvailabilityRuleInput, type AppCalendarEventInput } from '@/lib/validations'
 import { cancelPendingReminderEmailEvents, reschedulePendingReminderEmailEvents } from '@/lib/booking-emails'
-import { GoogleCalendarConnectionError } from '@/lib/google-calendar/client'
+import { getGoogleCalendarConnection, GoogleCalendarConnectionError } from '@/lib/google-calendar/client'
 import { createGoogleEventForAppEvent, listGoogleEvents } from '@/lib/google-calendar/events'
 
 export async function addRuleAction(data: AvailabilityRuleInput) {
@@ -241,6 +241,20 @@ export async function createTeacherCalendarEventAction(data: AppCalendarEventInp
 }
 
 export async function listTeacherGoogleEventsAction(input: { timeMin: string; timeMax: string; timeZone?: string }) {
+  const result = await loadTeacherCalendarRangeAction(input)
+
+  if (result.error) {
+    return { error: result.error }
+  }
+
+  return {
+    success: true,
+    events: result.googleEvents || [],
+    warning: result.warning || null,
+  }
+}
+
+export async function loadTeacherCalendarRangeAction(input: { timeMin: string; timeMax: string; timeZone?: string }) {
   try {
     const supabase = await createClient()
     const {
@@ -258,41 +272,63 @@ export async function listTeacherGoogleEventsAction(input: { timeMin: string; ti
       return { error: 'Invalid calendar range' }
     }
 
-    const [{ data: appEvents }, { data: bookings }] = await Promise.all([
+    const [{ data: appEvents, error: appEventsError }, { data: bookings, error: bookingsError }] = await Promise.all([
       supabase
         .from('calendar_events')
-        .select('google_event_id')
+        .select('*')
         .eq('user_id', user.id)
-        .not('google_event_id', 'is', null)
         .gte('start_ts', input.timeMin)
-        .lte('start_ts', input.timeMax),
+        .lte('start_ts', input.timeMax)
+        .order('start_ts', { ascending: true }),
       supabase
         .from('bookings')
-        .select('google_event_id')
+        .select('*')
         .eq('user_id', user.id)
-        .not('google_event_id', 'is', null)
+        .neq('status', 'cancelled')
         .gte('start_ts', input.timeMin)
-        .lte('start_ts', input.timeMax),
+        .lte('start_ts', input.timeMax)
+        .order('start_ts', { ascending: true }),
     ])
+
+    if (appEventsError) throw appEventsError
+    if (bookingsError) throw bookingsError
 
     const excludeGoogleEventIds = [
       ...(appEvents || []).map((event) => event.google_event_id).filter(Boolean),
       ...(bookings || []).map((booking) => booking.google_event_id).filter(Boolean),
     ] as string[]
-    const events = await listGoogleEvents(user.id, {
-      timeMin: input.timeMin,
-      timeMax: input.timeMax,
-      timeZone: input.timeZone,
-      excludeGoogleEventIds,
-    })
 
-    return { success: true, events }
-  } catch (error: any) {
-    if (error instanceof GoogleCalendarConnectionError) {
-      return { success: true, events: [], warning: error.message }
+    let googleEvents: Awaited<ReturnType<typeof listGoogleEvents>> = []
+    let warning: string | null = null
+
+    try {
+      const connection = await getGoogleCalendarConnection(user.id)
+
+      if (connection?.connection_status === 'connected') {
+        googleEvents = await listGoogleEvents(user.id, {
+          timeMin: input.timeMin,
+          timeMax: input.timeMax,
+          timeZone: input.timeZone,
+          excludeGoogleEventIds,
+        })
+      } else if (connection?.connection_status === 'needs_reconnect') {
+        warning = 'Google Calendar needs to be reconnected.'
+      }
+    } catch (error: any) {
+      warning = error instanceof GoogleCalendarConnectionError
+        ? error.message
+        : 'Google Calendar events could not be loaded.'
     }
 
-    console.error('Error listing teacher Google Calendar events:', error)
-    return { error: error.message || 'Failed to load Google Calendar events' }
+    return {
+      success: true,
+      calendarEvents: appEvents || [],
+      bookings: bookings || [],
+      googleEvents,
+      warning,
+    }
+  } catch (error: any) {
+    console.error('Error loading teacher calendar range:', error)
+    return { error: error.message || 'Failed to load calendar events' }
   }
 }

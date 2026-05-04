@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/use-toast'
-import { AlertCircle, Bell, Calendar, CheckCircle2, Clock, ExternalLink, Link2, Loader2, Plus, RefreshCw, Trash2, Unplug, XCircle } from 'lucide-react'
+import { AlertCircle, Bell, Calendar, CheckCircle2, ChevronLeft, ChevronRight, Clock, ExternalLink, Link2, Loader2, Plus, RefreshCw, Trash2, Unplug, XCircle } from 'lucide-react'
 import type { AvailabilityRule, Booking, CalendarEvent, GoogleCalendarConnectionSummary, GoogleCalendarEvent, UnifiedCalendarEvent } from '@/lib/types'
-import { addRuleAction, deleteRuleAction, updateReminderPreferenceAction, cancelBookingAction, createTeacherCalendarEventAction, listTeacherGoogleEventsAction } from './actions'
-import { getDayName, formatDateTime } from '@/lib/utils'
+import { addRuleAction, deleteRuleAction, updateReminderPreferenceAction, cancelBookingAction, createTeacherCalendarEventAction, loadTeacherCalendarRangeAction } from './actions'
+import { cn, getDayName } from '@/lib/utils'
 
 interface CalendarContentProps {
   rules: AvailabilityRule[]
@@ -24,19 +24,12 @@ interface CalendarContentProps {
   googleConnection: GoogleCalendarConnectionSummary | null
   googleEvents: GoogleCalendarEvent[]
   googleWarning: string | null
-  initialRangeStart: string
-  initialRangeEnd: string
+  googleCalendarStatus: string | null
 }
 
 type Meridiem = 'AM' | 'PM'
 
 const padTime = (value: number) => value.toString().padStart(2, '0')
-
-const toDateInputValue = (date: Date | string) => {
-  const value = new Date(date)
-  if (Number.isNaN(value.getTime())) return ''
-  return value.toISOString().slice(0, 10)
-}
 
 const toDateTimeLocalValue = (date: Date | string) => {
   const value = new Date(date)
@@ -50,15 +43,71 @@ const fromDateTimeLocalValue = (value: string) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
 }
 
-const getRangeIso = (startDate: string, endDate: string) => {
-  const start = new Date(`${startDate}T00:00:00`)
-  const end = new Date(`${endDate}T23:59:59`)
+const toDateKey = (date: Date | string) => {
+  const value = new Date(date)
 
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-    return null
+  if (Number.isNaN(value.getTime())) return ''
+
+  return [
+    value.getFullYear(),
+    padTime(value.getMonth() + 1),
+    padTime(value.getDate()),
+  ].join('-')
+}
+
+const getMonthGridRange = (monthDate: Date) => {
+  const start = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 0, 0, 0, 0)
+  start.setDate(start.getDate() - start.getDay())
+
+  const end = new Date(start)
+  end.setDate(start.getDate() + 41)
+  end.setHours(23, 59, 59, 999)
+
+  return { start, end }
+}
+
+const getMonthDays = (monthDate: Date) => {
+  const { start } = getMonthGridRange(monthDate)
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(start)
+    day.setDate(start.getDate() + index)
+    return day
+  })
+}
+
+const formatMonthLabel = (date: Date) =>
+  date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+const formatSelectedDayLabel = (dateKey: string) => {
+  const date = new Date(`${dateKey}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return 'Selected day'
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
+const formatEventTimeRange = (start: string, end: string) => {
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return ''
   }
 
-  return { timeMin: start.toISOString(), timeMax: end.toISOString() }
+  return `${startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
+
+const getEventSourceClassName = (source: UnifiedCalendarEvent['source']) => {
+  if (source === 'google') return 'border-amber-300 bg-amber-50 text-amber-950'
+  if (source === 'booking') return 'border-blue-300 bg-blue-50 text-blue-950'
+  if (source === 'homework') return 'border-purple-300 bg-purple-50 text-purple-950'
+  return 'border-emerald-300 bg-emerald-50 text-emerald-950'
+}
+
+const getEventSourceDotClassName = (source: UnifiedCalendarEvent['source']) => {
+  if (source === 'google') return 'bg-amber-500'
+  if (source === 'booking') return 'bg-blue-500'
+  if (source === 'homework') return 'bg-purple-500'
+  return 'bg-emerald-500'
 }
 
 const formatTimeForDisplay = (time24: string) => {
@@ -148,8 +197,7 @@ export function CalendarContent({
   googleConnection,
   googleEvents,
   googleWarning,
-  initialRangeStart,
-  initialRangeEnd,
+  googleCalendarStatus,
 }: CalendarContentProps) {
   const initialStartTime = toTimeEditorValue('09:00')
   const initialEndTime = toTimeEditorValue('17:00')
@@ -159,10 +207,15 @@ export function CalendarContent({
   const [savingReminder, setSavingReminder] = useState(false)
   const [creatingEvent, setCreatingEvent] = useState(false)
   const [syncingGoogle, setSyncingGoogle] = useState(false)
+  const [calendarEventItems, setCalendarEventItems] = useState(calendarEvents)
+  const [bookingItems, setBookingItems] = useState(bookings)
   const [googleCalendarEvents, setGoogleCalendarEvents] = useState(googleEvents)
   const [googleCalendarWarning, setGoogleCalendarWarning] = useState<string | null>(googleWarning)
-  const [rangeStart, setRangeStart] = useState(toDateInputValue(initialRangeStart))
-  const [rangeEnd, setRangeEnd] = useState(toDateInputValue(initialRangeEnd))
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const today = new Date()
+    return new Date(today.getFullYear(), today.getMonth(), 1)
+  })
+  const [selectedDateKey, setSelectedDateKey] = useState(toDateKey(new Date()))
   const [newCalendarEvent, setNewCalendarEvent] = useState({
     title: '',
     description: '',
@@ -188,8 +241,24 @@ export function CalendarContent({
   const router = useRouter()
   const googleConnected = googleConnection?.connection_status === 'connected'
 
+  useEffect(() => {
+    setCalendarEventItems(calendarEvents)
+    setBookingItems(bookings)
+    setGoogleCalendarEvents(googleEvents)
+    setGoogleCalendarWarning(googleWarning)
+  }, [bookings, calendarEvents, googleEvents, googleWarning])
+
+  useEffect(() => {
+    if (!googleConnected) return
+
+    setNewCalendarEvent((current) => ({
+      ...current,
+      add_to_google_calendar: true,
+    }))
+  }, [googleConnected])
+
   const unifiedEvents = useMemo<UnifiedCalendarEvent[]>(() => {
-    const appItems: UnifiedCalendarEvent[] = calendarEvents.map((event) => ({
+    const appItems: UnifiedCalendarEvent[] = calendarEventItems.map((event) => ({
       id: `app:${event.id}`,
       title: event.title,
       description: event.description,
@@ -202,7 +271,7 @@ export function CalendarContent({
       googleSyncStatus: event.google_sync_status,
     }))
 
-    const bookingItems: UnifiedCalendarEvent[] = bookings.map((booking) => ({
+    const bookingCalendarItems: UnifiedCalendarEvent[] = bookingItems.map((booking) => ({
       id: `booking:${booking.id}`,
       title: `Booking with ${booking.prospect_name}`,
       description: booking.reason,
@@ -226,10 +295,67 @@ export function CalendarContent({
       htmlLink: event.htmlLink,
     }))
 
-    return [...appItems, ...bookingItems, ...googleItems].sort(
+    return [...appItems, ...bookingCalendarItems, ...googleItems].sort(
       (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
     )
-  }, [bookings, calendarEvents, googleCalendarEvents])
+  }, [bookingItems, calendarEventItems, googleCalendarEvents])
+
+  const monthDays = useMemo(() => getMonthDays(visibleMonth), [visibleMonth])
+  const visibleRangeLabel = useMemo(() => {
+    const { start, end } = getMonthGridRange(visibleMonth)
+    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+  }, [visibleMonth])
+  const eventsByDate = useMemo(() => {
+    const grouped = new Map<string, UnifiedCalendarEvent[]>()
+
+    unifiedEvents.forEach((event) => {
+      const dateKey = toDateKey(event.start)
+      if (!dateKey) return
+
+      grouped.set(dateKey, [...(grouped.get(dateKey) || []), event])
+    })
+
+    return grouped
+  }, [unifiedEvents])
+  const selectedDayEvents = eventsByDate.get(selectedDateKey) || []
+  const googleStatusMessage = useMemo(() => {
+    if (googleCalendarStatus === 'connected' && googleConnected) {
+      return {
+        tone: 'success' as const,
+        text: 'Google Calendar is connected. Events in the visible calendar range can now be synced.',
+      }
+    }
+
+    if (googleCalendarStatus === 'connected' && !googleConnected) {
+      return {
+        tone: 'warning' as const,
+        text: 'Google finished authorization, but SoloTutorSuite cannot read a saved connection yet. Refresh once; if it remains disconnected, check that migration 011 ran and the Google redirect URI points to this app.',
+      }
+    }
+
+    if (googleCalendarStatus === 'needs_reconnect') {
+      return {
+        tone: 'warning' as const,
+        text: 'Google did not return a refresh token. Connect again and approve offline access.',
+      }
+    }
+
+    if (googleCalendarStatus === 'failed' || googleCalendarStatus === 'config_missing') {
+      return {
+        tone: 'warning' as const,
+        text: 'Google Calendar could not be connected. Check the Vercel Google env vars and the Google OAuth redirect URI.',
+      }
+    }
+
+    if (googleCalendarStatus === 'cancelled') {
+      return {
+        tone: 'warning' as const,
+        text: 'Google Calendar connection was cancelled.',
+      }
+    }
+
+    return null
+  }, [googleCalendarStatus, googleConnected])
 
   const handleAddRule = async () => {
     if (!newRule.day_of_week) {
@@ -330,6 +456,58 @@ export function CalendarContent({
     }
   }
 
+  const loadVisibleCalendarRange = async (
+    month = visibleMonth,
+    options: { showToast?: boolean } = { showToast: true }
+  ) => {
+    const { start, end } = getMonthGridRange(month)
+    const range = { timeMin: start.toISOString(), timeMax: end.toISOString() }
+    const rangeLabel = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+
+    setSyncingGoogle(true)
+    setGoogleCalendarWarning(null)
+
+    try {
+      const result = await loadTeacherCalendarRangeAction({
+        ...range,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
+
+      if (result.error) throw new Error(result.error)
+
+      setCalendarEventItems(result.calendarEvents || [])
+      setBookingItems(result.bookings || [])
+      setGoogleCalendarEvents(result.googleEvents || [])
+      setGoogleCalendarWarning(result.warning || null)
+
+      if (options.showToast) {
+        toast({
+          title: googleConnected ? 'Calendar synced' : 'Calendar refreshed',
+          description: result.warning || `Visible range: ${rangeLabel}`,
+        })
+      }
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setSyncingGoogle(false)
+    }
+  }
+
+  const handleChangeMonth = async (offset: number) => {
+    const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + offset, 1)
+    setVisibleMonth(nextMonth)
+    setSelectedDateKey(toDateKey(nextMonth))
+    await loadVisibleCalendarRange(nextMonth, { showToast: false })
+  }
+
+  const handleToday = async () => {
+    const today = new Date()
+    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+    setVisibleMonth(currentMonth)
+    setSelectedDateKey(toDateKey(today))
+    await loadVisibleCalendarRange(currentMonth, { showToast: false })
+  }
+
   const handleCreateCalendarEvent = async () => {
     const startIso = fromDateTimeLocalValue(newCalendarEvent.start_ts)
     const endIso = fromDateTimeLocalValue(newCalendarEvent.end_ts)
@@ -366,6 +544,7 @@ export function CalendarContent({
         event_type: 'teacher_event',
         add_to_google_calendar: googleConnected,
       })
+      await loadVisibleCalendarRange(visibleMonth, { showToast: false })
       router.refresh()
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' })
@@ -375,33 +554,7 @@ export function CalendarContent({
   }
 
   const handleSyncGoogleEvents = async () => {
-    const range = getRangeIso(rangeStart, rangeEnd)
-    if (!range) {
-      toast({ title: 'Invalid date range', variant: 'destructive' })
-      return
-    }
-
-    setSyncingGoogle(true)
-    setGoogleCalendarWarning(null)
-    try {
-      const result = await listTeacherGoogleEventsAction({
-        ...range,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      })
-
-      if (result.error) throw new Error(result.error)
-
-      setGoogleCalendarEvents(result.events || [])
-      setGoogleCalendarWarning(result.warning || null)
-      toast({
-        title: 'Calendar refreshed',
-        description: result.warning || undefined,
-      })
-    } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' })
-    } finally {
-      setSyncingGoogle(false)
-    }
+    await loadVisibleCalendarRange(visibleMonth)
   }
 
   const handleDisconnectGoogle = async () => {
@@ -424,12 +577,12 @@ export function CalendarContent({
   const bookingUrl = slug ? `/book/${slug}` : null
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Calendar & Booking</h1>
           <p className="text-muted-foreground">
-            Set your availability and view upcoming bookings
+            Manage availability, bookings, lessons, and synced Google events.
           </p>
         </div>
         {bookingUrl && (
@@ -483,6 +636,23 @@ export function CalendarContent({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {googleStatusMessage && (
+            <div
+              className={cn(
+                'flex items-start gap-2 rounded-lg border p-3 text-sm',
+                googleStatusMessage.tone === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                  : 'border-amber-200 bg-amber-50 text-amber-900'
+              )}
+            >
+              {googleStatusMessage.tone === 'success' ? (
+                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              )}
+              <span>{googleStatusMessage.text}</span>
+            </div>
+          )}
           {googleCalendarWarning && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
@@ -509,7 +679,7 @@ export function CalendarContent({
                 <>
                   <Button variant="outline" onClick={handleSyncGoogleEvents} disabled={syncingGoogle}>
                     {syncingGoogle ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Sync Now
+                    Sync Visible Calendar
                   </Button>
                   <Button variant="ghost" onClick={handleDisconnectGoogle} disabled={syncingGoogle}>
                     <Unplug className="mr-2 h-4 w-4" />
@@ -519,24 +689,9 @@ export function CalendarContent({
               )}
             </div>
           </div>
-          {googleConnected && (
-            <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-              <div>
-                <Label className="text-xs">From</Label>
-                <Input type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs">To</Label>
-                <Input type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} />
-              </div>
-              <div className="flex items-end">
-                <Button variant="outline" onClick={handleSyncGoogleEvents} disabled={syncingGoogle} className="w-full">
-                  {syncingGoogle ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  Refresh
-                </Button>
-              </div>
-            </div>
-          )}
+          <p className="text-xs text-muted-foreground">
+            The sync button refreshes SoloTutorSuite and Google events for the visible calendar range: {visibleRangeLabel}.
+          </p>
         </CardContent>
       </Card>
 
@@ -667,61 +822,201 @@ export function CalendarContent({
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Schedule
-          </CardTitle>
-          <CardDescription>
-            SoloTutorSuite bookings, calendar entries, and Google events.
-          </CardDescription>
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Calendar
+              </CardTitle>
+              <CardDescription>
+                SoloTutorSuite lessons, onboarding bookings, and Google events in one workspace.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={handleToday} disabled={syncingGoogle}>
+                Today
+              </Button>
+              <div className="flex overflow-hidden rounded-md border">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-none border-r"
+                  onClick={() => handleChangeMonth(-1)}
+                  disabled={syncingGoogle}
+                  aria-label="Previous month"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-none"
+                  onClick={() => handleChangeMonth(1)}
+                  disabled={syncingGoogle}
+                  aria-label="Next month"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button onClick={handleSyncGoogleEvents} disabled={syncingGoogle} variant={googleConnected ? 'default' : 'outline'}>
+                {syncingGoogle ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                {googleConnected ? 'Sync Visible Calendar' : 'Refresh Calendar'}
+              </Button>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          {unifiedEvents.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No events in this range yet.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {unifiedEvents.map((event) => (
-                <div key={event.id} className="rounded-lg border p-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{event.title}</p>
-                        <Badge variant={event.source === 'google' ? 'outline' : 'secondary'}>
-                          {event.sourceLabel}
-                        </Badge>
-                        {event.googleSyncStatus === 'failed' && (
-                          <Badge variant="destructive">Google sync failed</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {formatDateTime(event.start)} - {formatDateTime(event.end)}
-                      </p>
-                      {event.location && (
-                        <p className="text-sm text-muted-foreground mt-1">{event.location}</p>
-                      )}
-                      {event.description && (
-                        <p className="text-sm mt-2">{event.description}</p>
-                      )}
-                    </div>
-                    {event.htmlLink && (
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={event.htmlLink} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          Open
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                </div>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <h2 className="text-lg font-semibold">{formatMonthLabel(visibleMonth)}</h2>
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              {[
+                { source: 'app' as const, label: 'SoloTutorSuite' },
+                { source: 'booking' as const, label: 'Bookings' },
+                { source: 'google' as const, label: 'Google' },
+              ].map((item) => (
+                <span key={item.source} className="inline-flex items-center gap-1.5">
+                  <span className={cn('h-2.5 w-2.5 rounded-full', getEventSourceDotClassName(item.source))} />
+                  {item.label}
+                </span>
               ))}
             </div>
-          )}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="overflow-x-auto rounded-lg border">
+              <div className="min-w-[760px]">
+                <div className="grid grid-cols-7 border-b bg-gray-50">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7">
+                  {monthDays.map((day) => {
+                    const dayKey = toDateKey(day)
+                    const dayEvents = eventsByDate.get(dayKey) || []
+                    const isCurrentMonth = day.getMonth() === visibleMonth.getMonth()
+                    const isSelected = dayKey === selectedDateKey
+                    const isToday = dayKey === toDateKey(new Date())
+
+                    return (
+                      <button
+                        key={dayKey}
+                        type="button"
+                        onClick={() => setSelectedDateKey(dayKey)}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          'min-h-[132px] border-b border-r p-2 text-left align-top transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset',
+                          !isCurrentMonth && 'bg-gray-50/70 text-muted-foreground',
+                          isSelected && 'bg-blue-50',
+                          isToday && 'shadow-[inset_0_0_0_2px_rgba(37,99,235,0.55)]'
+                        )}
+                      >
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className={cn('text-sm font-semibold', isToday && 'text-blue-700')}>
+                            {day.getDate()}
+                          </span>
+                          {dayEvents.length > 0 && (
+                            <span className="rounded-full bg-gray-900 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                              {dayEvents.length}
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          {dayEvents.slice(0, 3).map((event) => (
+                            <div
+                              key={event.id}
+                              className={cn(
+                                'min-h-7 rounded border px-2 py-1 text-xs leading-tight',
+                                getEventSourceClassName(event.source)
+                              )}
+                            >
+                              <div className="truncate font-semibold">{event.title}</div>
+                              <div className="truncate opacity-80">{formatEventTimeRange(event.start, event.end)}</div>
+                            </div>
+                          ))}
+                          {dayEvents.length > 3 && (
+                            <div className="text-xs font-medium text-muted-foreground">
+                              +{dayEvents.length - 3} more
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Selected Day
+                </p>
+                <h3 className="text-lg font-semibold">{formatSelectedDayLabel(selectedDateKey)}</h3>
+              </div>
+
+              {selectedDayEvents.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  No events on this day.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {selectedDayEvents.map((event) => {
+                    const bookingId = event.source === 'booking' ? event.id.replace('booking:', '') : null
+
+                    return (
+                      <div key={event.id} className={cn('rounded-lg border p-3', getEventSourceClassName(event.source))}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="min-w-0 flex-1 font-semibold">{event.title}</p>
+                          <Badge variant={event.source === 'google' ? 'outline' : 'secondary'}>
+                            {event.sourceLabel}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-sm opacity-80">
+                          {formatEventTimeRange(event.start, event.end)}
+                        </p>
+                        {event.location && (
+                          <p className="mt-1 text-sm opacity-80">{event.location}</p>
+                        )}
+                        {event.description && (
+                          <p className="mt-2 text-sm">{event.description}</p>
+                        )}
+                        {event.googleSyncStatus === 'failed' && (
+                          <Badge variant="destructive" className="mt-3">Google sync failed</Badge>
+                        )}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {event.htmlLink && (
+                            <Button variant="outline" size="sm" asChild>
+                              <a href={event.htmlLink} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                Open
+                              </a>
+                            </Button>
+                          )}
+                          {bookingId && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCancelBooking(bookingId)}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Cancel Booking
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid gap-6">
         {/* Availability */}
         <Card>
           <CardHeader>
@@ -916,64 +1211,6 @@ export function CalendarContent({
           </CardContent>
         </Card>
 
-        {/* Upcoming Bookings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Upcoming Bookings
-            </CardTitle>
-            <CardDescription>
-              Sessions scheduled with you
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {bookings.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No upcoming bookings yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {bookings.map((booking) => (
-                  <div
-                    key={booking.id}
-                    className="p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium">{booking.prospect_name}</p>
-                        <p className="text-sm text-muted-foreground">{booking.prospect_email}</p>
-                      </div>
-                      <Badge variant="secondary">
-                        {booking.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm mt-2">
-                      {formatDateTime(booking.start_ts)}
-                    </p>
-                    {booking.reason && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        &quot;{booking.reason}&quot;
-                      </p>
-                    )}
-                    {booking.status === 'confirmed' && (
-                      <div className="mt-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCancelBooking(booking.id)}
-                        >
-                          <XCircle className="w-4 h-4 mr-2" />
-                          Cancel Booking
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

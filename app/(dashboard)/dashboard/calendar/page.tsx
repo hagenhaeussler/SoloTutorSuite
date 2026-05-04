@@ -4,14 +4,24 @@ import { CalendarContent } from './calendar-content'
 import { getGoogleCalendarConnection, toGoogleCalendarConnectionSummary } from '@/lib/google-calendar/client'
 import { listGoogleEvents } from '@/lib/google-calendar/events'
 
-export default async function CalendarPage() {
+type CalendarPageProps = {
+  searchParams?: Promise<{ googleCalendar?: string }> | { googleCalendar?: string }
+}
+
+export default async function CalendarPage({ searchParams }: CalendarPageProps) {
+  const resolvedSearchParams = await Promise.resolve(searchParams || {})
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
 
-  const rangeStart = new Date()
-  const rangeEnd = new Date(rangeStart.getTime() + 30 * 24 * 60 * 60 * 1000)
+  const today = new Date()
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0)
+  const rangeStart = new Date(monthStart)
+  rangeStart.setDate(monthStart.getDate() - monthStart.getDay())
+  const rangeEnd = new Date(rangeStart)
+  rangeEnd.setDate(rangeStart.getDate() + 41)
+  rangeEnd.setHours(23, 59, 59, 999)
 
   // Get availability rules
   const { data: rules } = await supabase
@@ -20,14 +30,15 @@ export default async function CalendarPage() {
     .eq('user_id', user.id)
     .order('day_of_week')
 
-  // Get upcoming bookings
+  // Get bookings in the first visible month. The client can load other visible ranges on demand.
   const { data: bookings } = await supabase
     .from('bookings')
     .select('*')
     .eq('user_id', user.id)
-    .gte('start_ts', new Date().toISOString())
+    .neq('status', 'cancelled')
+    .gte('start_ts', rangeStart.toISOString())
+    .lte('start_ts', rangeEnd.toISOString())
     .order('start_ts')
-    .limit(20)
 
   const { data: calendarEvents } = await supabase
     .from('calendar_events')
@@ -85,8 +96,7 @@ export default async function CalendarPage() {
       googleConnection={googleConnection}
       googleEvents={googleEvents}
       googleWarning={googleWarning}
-      initialRangeStart={rangeStart.toISOString()}
-      initialRangeEnd={rangeEnd.toISOString()}
+      googleCalendarStatus={resolvedSearchParams.googleCalendar || null}
     />
   )
 }

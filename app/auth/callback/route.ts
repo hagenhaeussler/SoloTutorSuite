@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
@@ -32,6 +32,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createClient()
+  const service = await createServiceClient()
 
   // Exchange the OAuth code for a session when present
   if (code) {
@@ -51,11 +52,11 @@ export async function GET(request: Request) {
   }
 
   // Determine which role to persist
-  const { data: profile } = await supabase
+  const { data: profile } = await service
     .from('profiles')
-    .select('role, student_invite_code, created_at')
+    .select('email, name, avatar_url, role, student_invite_code, created_at')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   const profileCreatedAt = profile?.created_at ? Date.parse(profile.created_at) : NaN
   const profileWasJustCreated =
@@ -86,17 +87,25 @@ export async function GET(request: Request) {
       : requestedRole
 
   if (!profile || profile.role !== roleToPersist || (roleToPersist === 'student' && !profile.student_invite_code)) {
+    const email = user.email || profile?.email
+    if (!email) {
+      return NextResponse.redirect(`${origin}/login?error=Could not read account email`)
+    }
+
     const inviteCode = roleToPersist === 'student'
       ? (profile?.student_invite_code || `STU-${user.id.slice(0, 8).toUpperCase()}`)
       : null
 
-    await supabase
+    await service
       .from('profiles')
-      .update({
+      .upsert({
+        id: user.id,
+        email,
+        name: profile?.name || user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0],
+        avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || null,
         role: roleToPersist,
         student_invite_code: inviteCode,
-      })
-      .eq('id', user.id)
+      }, { onConflict: 'id' })
   }
 
   if (roleToPersist === 'student') {

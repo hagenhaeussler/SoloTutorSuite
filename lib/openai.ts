@@ -5,6 +5,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+const OPENAI_GENERATION_MODEL = 'gpt-5.4-nano'
+
 export async function generateGrowthPlan(onboarding: TutorOnboarding, tutorName: string) {
   const prompt = `You are a marketing expert for tutors. Create a comprehensive growth plan for this tutor:
 
@@ -37,7 +39,7 @@ Generate a detailed growth plan in JSON format with these exact fields:
 Be specific and actionable. Tailor everything to this tutor's niche and target market.`
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: OPENAI_GENERATION_MODEL,
     messages: [{ role: 'user', content: prompt }],
     response_format: { type: 'json_object' },
     temperature: 0.7,
@@ -133,7 +135,7 @@ Return JSON:
   if (!prompt) throw new Error(`Unknown asset type: ${assetType}`)
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: OPENAI_GENERATION_MODEL,
     messages: [{ role: 'user', content: prompt }],
     response_format: { type: 'json_object' },
     temperature: 0.7,
