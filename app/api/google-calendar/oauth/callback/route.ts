@@ -12,6 +12,23 @@ import { encryptToken } from '@/lib/google-calendar/token-crypto'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+function getSafeCallbackFailureReason(error: any) {
+  const message = String(error?.message || '')
+  const code = String(error?.code || '')
+
+  if (/SUPABASE_SERVICE_ROLE_KEY/i.test(message)) return 'service_role_missing'
+  if (/GOOGLE_TOKEN_ENCRYPTION_KEY/i.test(message)) return 'encryption_key_missing'
+  if (code === '42P01' || /google_calendar_connections/i.test(message)) return 'connection_table_missing'
+  if (code === '42P10' || /no unique|unique constraint|on conflict/i.test(message)) return 'missing_unique_constraint'
+  if (code === '42501' || /permission denied|row-level security|invalid api key|JWT/i.test(message)) {
+    return 'supabase_permission_denied'
+  }
+  if (/state/i.test(message)) return 'invalid_state'
+  if (/token/i.test(message)) return 'token_exchange_failed'
+
+  return 'callback_exception'
+}
+
 async function getGoogleEmailFromTokens(oauthClient: ReturnType<typeof getGoogleOAuthClient>, idToken?: string | null) {
   if (idToken) {
     try {
@@ -45,7 +62,9 @@ export async function GET(request: NextRequest) {
     returnTo = state.returnTo
 
     if (error || !code) {
-      return NextResponse.redirect(new URL(appendGoogleCalendarStatus(returnTo, 'cancelled'), request.url))
+      return NextResponse.redirect(
+        new URL(appendGoogleCalendarStatus(returnTo, 'cancelled', error ? `oauth_${error}` : 'oauth_missing_code'), request.url)
+      )
     }
 
     const supabase = await createClient()
@@ -61,7 +80,7 @@ export async function GET(request: NextRequest) {
     const { tokens } = await oauthClient.getToken(code)
 
     if (!tokens.refresh_token) {
-      return NextResponse.redirect(new URL(appendGoogleCalendarStatus(returnTo, 'needs_reconnect'), request.url))
+      return NextResponse.redirect(new URL(appendGoogleCalendarStatus(returnTo, 'needs_reconnect', 'missing_refresh_token'), request.url))
     }
 
     oauthClient.setCredentials(tokens)
@@ -83,12 +102,19 @@ export async function GET(request: NextRequest) {
     )
 
     if (upsertError) {
-      throw upsertError
+      console.error('Google Calendar connection upsert failed:', upsertError.code || 'no_code', upsertError.message || 'Unknown error')
+      const upsertReason = getSafeCallbackFailureReason(upsertError)
+      return NextResponse.redirect(
+        new URL(
+          appendGoogleCalendarStatus(returnTo, 'failed', upsertReason === 'callback_exception' ? 'supabase_upsert_failed' : upsertReason),
+          request.url
+        )
+      )
     }
 
     return NextResponse.redirect(new URL(appendGoogleCalendarStatus(returnTo, 'connected'), request.url))
   } catch (error: any) {
     console.error('Google Calendar callback failed:', error?.message || 'Unknown error')
-    return NextResponse.redirect(new URL(appendGoogleCalendarStatus(returnTo, 'failed'), request.url))
+    return NextResponse.redirect(new URL(appendGoogleCalendarStatus(returnTo, 'failed', getSafeCallbackFailureReason(error)), request.url))
   }
 }

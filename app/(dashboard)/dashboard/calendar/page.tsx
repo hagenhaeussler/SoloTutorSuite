@@ -5,7 +5,7 @@ import { getGoogleCalendarConnection, toGoogleCalendarConnectionSummary } from '
 import { listGoogleEvents } from '@/lib/google-calendar/events'
 
 type CalendarPageProps = {
-  searchParams?: Promise<{ googleCalendar?: string }> | { googleCalendar?: string }
+  searchParams?: Promise<{ googleCalendar?: string; googleCalendarReason?: string }> | { googleCalendar?: string; googleCalendarReason?: string }
 }
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
@@ -97,6 +97,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
       googleEvents={googleEvents}
       googleWarning={googleWarning}
       googleCalendarStatus={resolvedSearchParams.googleCalendar || null}
+      googleCalendarReason={resolvedSearchParams.googleCalendarReason || null}
     />
   )
 }

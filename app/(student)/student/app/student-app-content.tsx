@@ -32,6 +32,7 @@ import {
   Unplug,
 } from 'lucide-react'
 import type { CalendarEvent, GoogleCalendarConnectionSummary, GoogleCalendarEvent, Homework, HomeworkSubmission, Student, StudentChatMessage, StudentFile, LessonNote, ProgressMilestone, MockSubscription, UnifiedCalendarEvent } from '@/lib/types'
+import { getGoogleCalendarDisconnectedText, getGoogleCalendarReasonText, getGoogleCalendarStatusDiagnostic } from '@/lib/google-calendar/diagnostics'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
 import {
   buyMockSubscriptionAction,
@@ -110,6 +111,8 @@ interface StudentAppContentProps {
   googleConnection: GoogleCalendarConnectionSummary | null
   googleEvents: GoogleCalendarEvent[]
   googleWarning: string | null
+  googleCalendarStatus: string | null
+  googleCalendarReason: string | null
   initialRangeStart: string
   initialRangeEnd: string
 }
@@ -131,6 +134,8 @@ export function StudentAppContent({
   googleConnection,
   googleEvents,
   googleWarning,
+  googleCalendarStatus,
+  googleCalendarReason,
   initialRangeStart,
   initialRangeEnd,
 }: StudentAppContentProps) {
@@ -164,6 +169,59 @@ export function StudentAppContent({
   const router = useRouter()
   const { toast } = useToast()
   const googleConnected = googleConnection?.connection_status === 'connected'
+  const googleStatusMessage = useMemo(
+    () =>
+      getGoogleCalendarStatusDiagnostic({
+        status: googleCalendarStatus,
+        reason: googleCalendarReason,
+        googleConnected,
+      }),
+    [googleCalendarReason, googleCalendarStatus, googleConnected]
+  )
+  const googleDiagnostics = useMemo(() => {
+    const rows = [
+      googleConnected
+        ? `Connection row found: primary calendar${googleConnection?.google_email ? ` for ${googleConnection.google_email}` : ''}.`
+        : googleConnection?.connection_status === 'needs_reconnect'
+          ? 'Connection row exists, but it is marked needs_reconnect.'
+          : getGoogleCalendarDisconnectedText(),
+      googleCalendarStatus
+        ? `Last OAuth callback status: ${googleCalendarStatus}${googleCalendarReason ? ` (${googleCalendarReason})` : ''}.`
+        : 'No Google OAuth callback status is present on this page load. If you just approved Google and came back here, the redirect URI may not be this app callback route.',
+      getGoogleCalendarReasonText(googleCalendarReason) ||
+        'Expected production callback: https://solotutorsuite.vercel.app/api/google-calendar/oauth/callback.',
+    ]
+
+    if (!googleConnected) {
+      rows.push('Add to my Google Calendar is disabled until a connected row exists for this signed-in student.')
+    }
+
+    if (googleCalendarWarning) {
+      rows.push(`Visible-range sync warning: ${googleCalendarWarning}`)
+    }
+
+    return rows
+  }, [googleCalendarReason, googleCalendarStatus, googleCalendarWarning, googleConnected, googleConnection?.google_email, googleConnection?.connection_status])
+
+  useEffect(() => {
+    if (!googleStatusMessage) return
+
+    toast({
+      title: googleStatusMessage.title,
+      description: googleStatusMessage.text,
+      variant: googleStatusMessage.tone === 'warning' ? 'destructive' : undefined,
+    })
+  }, [googleStatusMessage, toast])
+
+  useEffect(() => {
+    if (!googleCalendarWarning) return
+
+    toast({
+      title: 'Google Calendar sync warning',
+      description: googleCalendarWarning,
+      variant: 'destructive',
+    })
+  }, [googleCalendarWarning, toast])
 
   useEffect(() => {
     if (connections.length === 0) return
@@ -485,6 +543,19 @@ export function StudentAppContent({
 
     setCreatingCalendarEvent(true)
     try {
+      if (!googleConnected) {
+        toast({
+          title: 'Google sync skipped for this event',
+          description: 'The event will be saved in SoloTutorSuite only because no connected Google Calendar row is available for this student account.',
+          variant: 'destructive',
+        })
+      } else if (!newCalendarEvent.add_to_google_calendar) {
+        toast({
+          title: 'Google sync disabled for this event',
+          description: 'The checkbox is off, so this event will only be saved inside SoloTutorSuite.',
+        })
+      }
+
       const result = await createStudentCalendarEventAction({
         student_id: selectedStudentId || '',
         title: newCalendarEvent.title,
@@ -499,8 +570,9 @@ export function StudentAppContent({
       if (result.error) throw new Error(result.error)
 
       toast({
-        title: 'Calendar event created',
+        title: result.warning ? 'Calendar event created with Google warning' : 'Calendar event created',
         description: result.warning || undefined,
+        variant: result.warning ? 'destructive' : undefined,
       })
       setNewCalendarEvent({
         title: '',
@@ -528,6 +600,14 @@ export function StudentAppContent({
     setSyncingGoogle(true)
     setGoogleCalendarWarning(null)
     try {
+      if (!googleConnected) {
+        toast({
+          title: 'Google sync skipped',
+          description: `${getGoogleCalendarDisconnectedText()} This refresh will not load Google events until the connection saves successfully.`,
+          variant: 'destructive',
+        })
+      }
+
       const result = await listStudentGoogleEventsAction({
         ...range,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -538,8 +618,9 @@ export function StudentAppContent({
       setGoogleCalendarEvents(result.events || [])
       setGoogleCalendarWarning(result.warning || null)
       toast({
-        title: 'Calendar refreshed',
+        title: result.warning ? 'Calendar refreshed with Google warning' : 'Calendar refreshed',
         description: result.warning || undefined,
+        variant: result.warning ? 'destructive' : undefined,
       })
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' })
@@ -615,10 +696,39 @@ export function StudentAppContent({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {googleStatusMessage && (
+              <div
+                className={cn(
+                  'flex items-start gap-2 rounded-lg border p-3 text-sm',
+                  googleStatusMessage.tone === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : 'border-amber-200 bg-amber-50 text-amber-900'
+                )}
+              >
+                {googleStatusMessage.tone === 'success' ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                )}
+                <span>
+                  <strong>{googleStatusMessage.title}:</strong> {googleStatusMessage.text}
+                </span>
+              </div>
+            )}
             {googleCalendarWarning && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <span>{googleCalendarWarning}</span>
+              </div>
+            )}
+            {(!googleConnected || googleStatusMessage || googleCalendarWarning) && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
+                <div className="mb-2 font-semibold">Google sync diagnostics</div>
+                <ul className="list-disc space-y-1 pl-5">
+                  {googleDiagnostics.map((item, index) => (
+                    <li key={`${index}-${item}`}>{item}</li>
+                  ))}
+                </ul>
               </div>
             )}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

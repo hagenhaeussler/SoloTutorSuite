@@ -6,7 +6,12 @@ import { listGoogleEvents } from '@/lib/google-calendar/events'
 
 const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || null
 
-export default async function StudentAppPage() {
+type StudentAppPageProps = {
+  searchParams?: Promise<{ googleCalendar?: string; googleCalendarReason?: string }> | { googleCalendar?: string; googleCalendarReason?: string }
+}
+
+export default async function StudentAppPage({ searchParams }: StudentAppPageProps) {
+  const resolvedSearchParams = await Promise.resolve(searchParams || {})
   const supabase = await createClient()
   const service = await createServiceClient()
   const {
@@ -281,6 +286,8 @@ export default async function StudentAppPage() {
       googleConnection={googleConnection}
       googleEvents={googleEvents}
       googleWarning={googleWarning}
+      googleCalendarStatus={resolvedSearchParams.googleCalendar || null}
+      googleCalendarReason={resolvedSearchParams.googleCalendarReason || null}
       initialRangeStart={rangeStart.toISOString()}
       initialRangeEnd={rangeEnd.toISOString()}
     />

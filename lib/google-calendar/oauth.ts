@@ -64,10 +64,15 @@ export function normalizeGoogleCalendarReturnTo(returnTo: string | null | undefi
   return returnTo
 }
 
-export function appendGoogleCalendarStatus(returnTo: string, status: string) {
+export function appendGoogleCalendarStatus(returnTo: string, status: string, reason?: string | null) {
   const [path, query = ''] = returnTo.split('?')
   const params = new URLSearchParams(query)
   params.set('googleCalendar', status)
+  if (reason) {
+    params.set('googleCalendarReason', reason)
+  } else {
+    params.delete('googleCalendarReason')
+  }
   const nextQuery = params.toString()
 
   return nextQuery ? `${path}?${nextQuery}` : path

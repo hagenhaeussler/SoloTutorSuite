@@ -313,6 +313,10 @@ export async function loadTeacherCalendarRangeAction(input: { timeMin: string; t
         })
       } else if (connection?.connection_status === 'needs_reconnect') {
         warning = 'Google Calendar needs to be reconnected.'
+      } else if (connection?.connection_status === 'disconnected') {
+        warning = 'Google Calendar is disconnected for this account, so only SoloTutorSuite events were refreshed.'
+      } else {
+        warning = 'No Google Calendar connection row was found for this tutor. If you just approved Google, the OAuth callback probably could not save the encrypted refresh token.'
       }
     } catch (error: any) {
       warning = error instanceof GoogleCalendarConnectionError

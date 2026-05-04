@@ -36,6 +36,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(authorizationUrl)
   } catch {
-    return NextResponse.redirect(new URL(appendGoogleCalendarStatus(returnTo, 'config_missing'), request.url))
+    return NextResponse.redirect(new URL(appendGoogleCalendarStatus(returnTo, 'config_missing', 'start_config_missing'), request.url))
   }
 }

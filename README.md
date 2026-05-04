@@ -109,6 +109,7 @@ Copy `.env.example` to `.env.local` and fill:
    - `010_mock_subscriptions.sql`
    - `011_google_calendar_integration.sql`
    - `012_student_email_invitations.sql`
+   - `013_production_student_invitation_repairs.sql`
 3. Confirm the `google_calendar_connections` table has RLS enabled.
 4. Confirm users can only select their own Google Calendar connection rows.
 5. Confirm `calendar_events`, `bookings`, and `homework` include the Google sync columns.
@@ -141,8 +142,16 @@ Copy `.env.example` to `.env.local` and fill:
 4. Generate `GOOGLE_TOKEN_ENCRYPTION_KEY` as a long random secret or 32-byte base64 key.
 5. Keep `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_TOKEN_ENCRYPTION_KEY` server-side only.
 6. Redeploy after saving environment variables.
+   - If Vercel marks `SUPABASE_SERVICE_ROLE_KEY` as "Needs Attention", replace it with the current project service-role key from Supabase and redeploy before testing Google Calendar.
 7. Test as both roles:
    - Sign in as a student and connect Google Calendar from `/student/app`.
    - Sign in as a tutor and connect Google Calendar from `/dashboard/calendar`.
    - Create one app calendar event from each side and confirm `google_event_id` is stored.
    - Disconnect and reconnect once to verify the reconnect flow.
+
+### Google Calendar troubleshooting
+
+- `GOOGLE_CALENDAR_REDIRECT_URI` must exactly match `https://YOUR_DOMAIN/api/google-calendar/oauth/callback`.
+- Google Cloud OAuth Client > Authorized redirect URIs must include that exact same callback URL.
+- If the app says "authorized, but no connection row is visible", check `SUPABASE_SERVICE_ROLE_KEY`, run migration `013`, redeploy, then reconnect Google Calendar.
+- The app never returns Google access tokens or refresh tokens to the browser; debug messages only expose safe status/reason codes.
