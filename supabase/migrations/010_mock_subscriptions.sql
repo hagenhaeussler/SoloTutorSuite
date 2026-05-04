@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS mock_subscriptions (
   description TEXT,
   amount_cents INT NOT NULL CHECK (amount_cents >= 0),
   currency TEXT NOT NULL DEFAULT 'USD',
-  billing_interval TEXT NOT NULL DEFAULT 'monthly' CHECK (billing_interval IN ('weekly', 'monthly', 'yearly')),
+  billing_interval TEXT NOT NULL DEFAULT 'monthly' CHECK (billing_interval IN ('once', 'weekly', 'monthly', 'yearly')),
   status TEXT NOT NULL DEFAULT 'offered' CHECK (status IN ('offered', 'active', 'cancelled')),
   started_at TIMESTAMPTZ,
   cancelled_at TIMESTAMPTZ,

@@ -171,7 +171,7 @@ export const mockSubscriptionOfferSchema = z.object({
   plan_name: z.string().trim().min(1, 'Enter a plan name').max(120, 'Plan name is too long'),
   description: z.string().max(2000, 'Description is too long').optional().or(z.literal('')),
   amount_dollars: z.number().min(0, 'Amount cannot be negative').max(100000, 'Amount is too high'),
-  billing_interval: z.enum(['weekly', 'monthly', 'yearly']).default('monthly'),
+  billing_interval: z.enum(['once', 'weekly', 'monthly', 'yearly']).default('monthly'),
 })
 
 export const appCalendarEventSchema = z

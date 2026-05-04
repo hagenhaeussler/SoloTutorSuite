@@ -519,6 +519,10 @@ export function StudentAppContent({
       currency: subscription.currency || 'USD',
     }).format(subscription.amount_cents / 100)
 
+    if (subscription.billing_interval === 'once') {
+      return `${amount} once`
+    }
+
     return `${amount}/${subscription.billing_interval.replace('ly', '')}`
   }
 
@@ -647,7 +651,7 @@ export function StudentAppContent({
   }
 
   const handleCancelSubscription = async (subscription: MockSubscription) => {
-    if (!confirm('Cancel this mock subscription?')) return
+    if (!confirm('Cancel this subscription?')) return
 
     setSubscriptionUpdatingId(subscription.id)
     try {
@@ -1498,15 +1502,15 @@ export function StudentAppContent({
                   <Card>
                     <CardHeader>
                       <CardTitle>Financials</CardTitle>
-                      <CardDescription>Mock subscriptions and session-based billing summary.</CardDescription>
+                      <CardDescription>Subscription offers and session-based billing summary.</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-lg border p-4">
-                          <p className="text-sm text-muted-foreground mb-2">Active mock subscriptions</p>
+                          <p className="text-sm text-muted-foreground mb-2">Active subscriptions</p>
                           <p className="text-2xl font-bold">${(activeSubscriptionTotalCents / 100).toFixed(2)}</p>
                           <p className="text-xs text-muted-foreground mt-2">
-                            Simulated recurring total for the selected tutor.
+                            Simulated active total for the selected tutor.
                           </p>
                         </div>
                         <div className="rounded-lg border p-4">
@@ -1523,7 +1527,7 @@ export function StudentAppContent({
                   <Card>
                     <CardHeader>
                       <CardTitle>Subscriptions</CardTitle>
-                      <CardDescription>Buy or cancel mock subscription offers from your tutor.</CardDescription>
+                      <CardDescription>Buy or cancel subscription offers from your tutor.</CardDescription>
                     </CardHeader>
                     <CardContent>
                       {filteredSubscriptions.length === 0 ? (

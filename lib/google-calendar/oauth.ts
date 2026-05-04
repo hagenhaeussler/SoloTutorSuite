@@ -22,13 +22,26 @@ export interface GoogleCalendarOAuthState {
 function getOAuthEnv() {
   const clientId = process.env.GOOGLE_CLIENT_ID
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET
-  const redirectUri = process.env.GOOGLE_CALENDAR_REDIRECT_URI
+  const redirectUri = normalizeEnvValue(process.env.GOOGLE_CALENDAR_REDIRECT_URI, 'GOOGLE_CALENDAR_REDIRECT_URI')
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error('Google Calendar OAuth is not configured')
   }
 
   return { clientId, clientSecret, redirectUri }
+}
+
+function normalizeEnvValue(value: string | undefined, key: string) {
+  if (!value) return value
+
+  const trimmed = value.trim().replace(/^['"]|['"]$/g, '')
+  const prefixedValue = `${key}=`
+
+  if (trimmed.startsWith(prefixedValue)) {
+    return trimmed.slice(prefixedValue.length).trim().replace(/^['"]|['"]$/g, '')
+  }
+
+  return trimmed
 }
 
 function getStateSecret() {

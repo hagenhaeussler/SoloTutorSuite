@@ -278,7 +278,7 @@ export interface MockSubscription {
   description: string | null
   amount_cents: number
   currency: string
-  billing_interval: 'weekly' | 'monthly' | 'yearly'
+  billing_interval: 'once' | 'weekly' | 'monthly' | 'yearly'
   status: 'offered' | 'active' | 'cancelled'
   started_at: string | null
   cancelled_at: string | null

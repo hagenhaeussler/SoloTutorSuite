@@ -30,7 +30,7 @@ export default function PrivacyPage() {
           <h2 className="pt-4 text-xl font-semibold text-gray-950">Information We Collect</h2>
           <p>
             We may store your name, email address, profile role, tutor/student records, bookings, homework, files, chat messages,
-            lesson notes, mock subscription records, and calendar metadata created or connected through SoloTutorSuite.
+            lesson notes, subscription records, and calendar metadata created or connected through SoloTutorSuite.
           </p>
 
           <h2 className="pt-4 text-xl font-semibold text-gray-950">Google Calendar Data</h2>

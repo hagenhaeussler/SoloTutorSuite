@@ -92,6 +92,10 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
       currency: subscription.currency || 'USD',
     }).format(subscription.amount_cents / 100)
 
+    if (subscription.billing_interval === 'once') {
+      return `${amount} once`
+    }
+
     return `${amount}/${subscription.billing_interval.replace('ly', '')}`
   }
 
@@ -355,7 +359,7 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
       setSubscriptionDescription('')
       setSubscriptionAmount('')
       setSubscriptionInterval('monthly')
-      toast({ title: 'Subscription offered', description: 'The student can now buy this mock subscription.' })
+      toast({ title: 'Subscription offered', description: 'The student can now buy this subscription offer.' })
       router.refresh()
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' })
@@ -365,7 +369,7 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
   }
 
   const handleCancelSubscription = async (subscription: MockSubscription) => {
-    if (!confirm('Cancel this mock subscription?')) return
+    if (!confirm('Cancel this subscription?')) return
 
     setSubscriptionUpdatingId(subscription.id)
     try {
@@ -725,9 +729,9 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Mock Subscription Offer</CardTitle>
+                <CardTitle>Subscription Offer</CardTitle>
                 <CardDescription>
-                  Offer a simulated subscription. No payment processor is connected.
+                  Offer a subscription plan. Payments are simulated for now.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -759,6 +763,7 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="once">Once</SelectItem>
                       <SelectItem value="weekly">Weekly</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>
                       <SelectItem value="yearly">Yearly</SelectItem>
@@ -784,13 +789,13 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
             <Card>
               <CardHeader>
                 <CardTitle>Subscriptions</CardTitle>
-                <CardDescription>View and cancel this student&apos;s mock subscription history.</CardDescription>
+                <CardDescription>View and cancel this student&apos;s subscription history.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="mb-4 rounded-lg border p-4">
-                  <p className="text-sm text-muted-foreground mb-2">Active mock subscriptions</p>
+                  <p className="text-sm text-muted-foreground mb-2">Active subscriptions</p>
                   <p className="text-2xl font-bold">${(activeSubscriptionTotalCents / 100).toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground mt-2">Simulated recurring total for this student.</p>
+                  <p className="text-xs text-muted-foreground mt-2">Simulated active total for this student.</p>
                 </div>
 
                 {subscriptions.length === 0 ? (
