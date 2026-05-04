@@ -5,6 +5,8 @@ import { appCalendarEventSchema, chatMessageSchema, type AppCalendarEventInput }
 import { GoogleCalendarConnectionError } from '@/lib/google-calendar/client'
 import { createGoogleEventForAppEvent, listGoogleEvents } from '@/lib/google-calendar/events'
 
+const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || null
+
 export async function submitHomeworkByAuthAction(formData: FormData) {
   try {
     const supabase = await createClient()
@@ -339,25 +341,40 @@ export async function acceptTutorInvitationAction(studentId: string) {
 
     if (!user) return { error: 'Not authenticated' }
 
+    const { data: profile } = await service
+      .from('profiles')
+      .select('email, role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || profile.role !== 'student') return { error: 'Student profile not found' }
+
+    const normalizedProfileEmail = normalizeEmail(profile.email)
     const { data: student } = await service
       .from('students')
-      .select('id')
+      .select('id, email, auth_user_id, invitation_status')
       .eq('id', studentId)
-      .eq('auth_user_id', user.id)
-      .eq('invitation_status', 'pending')
       .single()
 
     if (!student) return { error: 'Invitation not found' }
+    if (student.invitation_status !== 'pending') return { error: 'Invitation is no longer pending' }
+
+    const isLinkedToUser = student.auth_user_id === user.id
+    const isExactEmailInvite = !student.auth_user_id && normalizeEmail(student.email) === normalizedProfileEmail
+
+    if (!isLinkedToUser && !isExactEmailInvite) {
+      return { error: 'Invitation not found for this student account' }
+    }
 
     const { error } = await service
       .from('students')
       .update({
+        auth_user_id: user.id,
         invitation_status: 'active',
         accepted_at: new Date().toISOString(),
         declined_at: null,
       })
       .eq('id', student.id)
-      .eq('auth_user_id', user.id)
 
     if (error) throw error
 
@@ -378,24 +395,39 @@ export async function declineTutorInvitationAction(studentId: string) {
 
     if (!user) return { error: 'Not authenticated' }
 
+    const { data: profile } = await service
+      .from('profiles')
+      .select('email, role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || profile.role !== 'student') return { error: 'Student profile not found' }
+
+    const normalizedProfileEmail = normalizeEmail(profile.email)
     const { data: student } = await service
       .from('students')
-      .select('id')
+      .select('id, email, auth_user_id, invitation_status')
       .eq('id', studentId)
-      .eq('auth_user_id', user.id)
-      .eq('invitation_status', 'pending')
       .single()
 
     if (!student) return { error: 'Invitation not found' }
+    if (student.invitation_status !== 'pending') return { error: 'Invitation is no longer pending' }
+
+    const isLinkedToUser = student.auth_user_id === user.id
+    const isExactEmailInvite = !student.auth_user_id && normalizeEmail(student.email) === normalizedProfileEmail
+
+    if (!isLinkedToUser && !isExactEmailInvite) {
+      return { error: 'Invitation not found for this student account' }
+    }
 
     const { error } = await service
       .from('students')
       .update({
+        auth_user_id: user.id,
         invitation_status: 'declined',
         declined_at: new Date().toISOString(),
       })
       .eq('id', student.id)
-      .eq('auth_user_id', user.id)
 
     if (error) throw error
 

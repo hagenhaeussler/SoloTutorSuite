@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AppLogo } from '@/components/app-logo'
@@ -164,6 +164,15 @@ export function StudentAppContent({
   const router = useRouter()
   const { toast } = useToast()
   const googleConnected = googleConnection?.connection_status === 'connected'
+
+  useEffect(() => {
+    if (connections.length === 0) return
+
+    const selectedStillExists = connections.some((connection) => connection.id === selectedStudentId)
+    if (!selectedStudentId || !selectedStillExists) {
+      setSelectedStudentId(connections[0].id)
+    }
+  }, [connections, selectedStudentId])
 
   const selectedConnection = useMemo(
     () => connections.find((c) => c.id === selectedStudentId) || null,

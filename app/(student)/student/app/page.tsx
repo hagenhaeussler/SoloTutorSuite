@@ -4,6 +4,8 @@ import { StudentAppContent } from './student-app-content'
 import { getGoogleCalendarConnection, toGoogleCalendarConnectionSummary } from '@/lib/google-calendar/client'
 import { listGoogleEvents } from '@/lib/google-calendar/events'
 
+const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || null
+
 export default async function StudentAppPage() {
   const supabase = await createClient()
   const service = await createServiceClient()
@@ -31,17 +33,26 @@ export default async function StudentAppPage() {
 
   const rangeStart = new Date()
   const rangeEnd = new Date(rangeStart.getTime() + 30 * 24 * 60 * 60 * 1000)
-  const normalizedProfileEmail = profile.email?.trim().toLowerCase()
+  const normalizedProfileEmail = normalizeEmail(profile.email)
 
   if (normalizedProfileEmail) {
-    const { data: unlinkedMatchingStudents } = await service
+    const { data: unlinkedCandidates, error: unlinkedError } = await service
       .from('students')
-      .select('id')
+      .select('id, email, invitation_status')
       .is('auth_user_id', null)
-      .ilike('email', normalizedProfileEmail)
+      .not('email', 'is', null)
+      .ilike('email', `%${normalizedProfileEmail}%`)
 
-    if ((unlinkedMatchingStudents || []).length > 0) {
-      await service
+    if (unlinkedError) {
+      console.error('Failed to load unlinked student invitations:', unlinkedError.message)
+    }
+
+    const exactUnlinkedMatches = (unlinkedCandidates || []).filter(
+      (student) => normalizeEmail(student.email) === normalizedProfileEmail && student.invitation_status !== 'declined'
+    )
+
+    if (exactUnlinkedMatches.length > 0) {
+      const { error: linkError } = await service
         .from('students')
         .update({
           auth_user_id: user.id,
@@ -49,7 +60,11 @@ export default async function StudentAppPage() {
           invited_at: new Date().toISOString(),
           declined_at: null,
         })
-        .in('id', unlinkedMatchingStudents!.map((student) => student.id))
+        .in('id', exactUnlinkedMatches.map((student) => student.id))
+
+      if (linkError) {
+        console.error('Failed to link exact-email student invitations:', linkError.message)
+      }
     }
   }
 
@@ -60,12 +75,31 @@ export default async function StudentAppPage() {
     .eq('invitation_status', 'active')
     .order('created_at', { ascending: false })
 
-  const { data: pendingInvitations } = await service
+  const { data: linkedPendingInvitations } = await service
     .from('students')
     .select('id, user_id, name, email, zoom_meeting_link, invitation_status, invited_at')
     .eq('auth_user_id', user.id)
     .eq('invitation_status', 'pending')
     .order('invited_at', { ascending: false })
+
+  const { data: unlinkedPendingCandidates } = normalizedProfileEmail
+    ? await service
+        .from('students')
+        .select('id, user_id, name, email, zoom_meeting_link, invitation_status, invited_at')
+        .is('auth_user_id', null)
+        .eq('invitation_status', 'pending')
+        .not('email', 'is', null)
+        .ilike('email', `%${normalizedProfileEmail}%`)
+        .order('invited_at', { ascending: false })
+    : { data: [] as any[] }
+
+  const unlinkedPendingInvitations = (unlinkedPendingCandidates || []).filter(
+    (student) => normalizeEmail(student.email) === normalizedProfileEmail
+  )
+  const pendingInvitationMap = new Map(
+    [...(linkedPendingInvitations || []), ...unlinkedPendingInvitations].map((invitation) => [invitation.id, invitation])
+  )
+  const pendingInvitations = Array.from(pendingInvitationMap.values())
 
   const tutorIds = Array.from(new Set([...(connections || []), ...(pendingInvitations || [])].map((c) => c.user_id)))
 
