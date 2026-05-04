@@ -84,6 +84,7 @@ export const leadSchema = z.object({
 export type LeadInput = z.infer<typeof leadSchema>
 
 export const studentStatusSchema = z.enum(['active', 'inactive', 'completed', 'lead'])
+export const studentInvitationStatusSchema = z.enum(['pending', 'active', 'declined'])
 
 // Student schema
 export const studentSchema = z.object({
@@ -96,6 +97,12 @@ export const studentSchema = z.object({
 })
 
 export type StudentInput = z.infer<typeof studentSchema>
+
+export const studentEmailInviteSchema = z.object({
+  email: z.string().trim().email('Enter a valid student email'),
+})
+
+export type StudentEmailInviteInput = z.infer<typeof studentEmailInviteSchema>
 
 export const updateStudentProfileSchema = z.object({
   id: z.string().uuid(),

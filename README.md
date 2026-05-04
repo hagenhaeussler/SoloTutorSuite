@@ -10,7 +10,7 @@ SoloTutorSuite is a Next.js + Supabase tutoring platform for independent tutors 
 - Google Calendar integration for students and tutors
 - CRM lead pipeline
 - Student hub (files, homework, submissions)
-- Student mode with tutor linking via Student ID
+- Student mode with email-based tutor invitations and student approval
 - Tutor↔student in-app chat
 - Mock financial subscriptions (teacher offers, student buy/cancel)
 - Transactional booking emails (confirmation + reminder queue)
@@ -41,6 +41,7 @@ SoloTutorSuite is a Next.js + Supabase tutoring platform for independent tutors 
 | Google Calendar sync | ✅ MVP implemented | OAuth offline access, encrypted refresh tokens, on-demand visible-range fetch, app-event inserts |
 | CRM pipeline | ✅ Implemented | Lead stages + conversion to students |
 | Students hub base workflows | ✅ Implemented | Add/manage students, files, homework, submissions |
+| Student email invitations | ✅ Implemented | Tutors invite existing student accounts by email; students accept before data appears |
 | Student profile fields (parent contact, subject/exam, notes, status) | ✅ Implemented | Schema + validations + actions + list visibility |
 | Student search/filter in hub | ✅ Implemented | Search + status filtering in Students Hub |
 | Parent/student progress sharing | ✅ Implemented | `/progress/[token]` + student app progress tab |
@@ -66,6 +67,7 @@ Run in order from `supabase/migrations/`:
 9. `009_catchup_missing_columns.sql`
 10. `010_mock_subscriptions.sql`
 11. `011_google_calendar_integration.sql`
+12. `012_student_email_invitations.sql`
 
 The Google Calendar migration is numbered `011` because this repo already has a `009` migration.
 
@@ -103,9 +105,10 @@ Copy `.env.example` to `.env.local` and fill:
 ### Supabase
 
 1. Open your Supabase project and run every pending migration in order from `supabase/migrations/`.
-2. For this release, make sure these two new migrations have run:
+2. For this release, make sure these new migrations have run:
    - `010_mock_subscriptions.sql`
    - `011_google_calendar_integration.sql`
+   - `012_student_email_invitations.sql`
 3. Confirm the `google_calendar_connections` table has RLS enabled.
 4. Confirm users can only select their own Google Calendar connection rows.
 5. Confirm `calendar_events`, `bookings`, and `homework` include the Google sync columns.

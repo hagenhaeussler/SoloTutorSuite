@@ -95,10 +95,10 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
     return `${amount}/${subscription.billing_interval.replace('ly', '')}`
   }
 
-  const copyLink = () => {
-    const url = `${window.location.origin}/student/${student.access_token}`
+  const copySignupLink = () => {
+    const url = `${window.location.origin}/login?role=student`
     navigator.clipboard.writeText(url)
-    toast({ title: 'Student portal link copied!' })
+    toast({ title: 'Student signup link copied!' })
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -426,9 +426,9 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
             <p className="text-muted-foreground">{student.email}</p>
           )}
         </div>
-        <Button variant="outline" onClick={copyLink}>
+        <Button variant="outline" onClick={copySignupLink}>
           <Copy className="w-4 h-4 mr-2" />
-          Copy Portal Link
+          Copy Signup Link
         </Button>
         <Button variant="destructive" onClick={handleDeleteStudent}>
           <Trash2 className="w-4 h-4 mr-2" />
@@ -438,12 +438,27 @@ export function StudentDetailContent({ student, files, homework, submissions, ch
 
       <Card className="mb-6">
         <CardContent className="py-4">
-          <p className="text-sm text-muted-foreground mb-2">Student Portal Link:</p>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium">Student Account Connection</p>
+            {student.invitation_status === 'active' && student.auth_user_id && (
+              <Badge variant="success">accepted</Badge>
+            )}
+            {student.invitation_status === 'pending' && (
+              <Badge variant="warning">invite pending</Badge>
+            )}
+            {student.invitation_status === 'declined' && (
+              <Badge variant="destructive">declined</Badge>
+            )}
+            {!student.auth_user_id && (
+              <Badge variant="outline">not signed up</Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mb-2">Student Google signup link:</p>
           <code className="text-sm bg-gray-100 px-2 py-1 rounded block overflow-x-auto">
-            {typeof window !== 'undefined' ? window.location.origin : ''}/student/{student.access_token}
+            {typeof window !== 'undefined' ? window.location.origin : ''}/login?role=student
           </code>
           <p className="text-xs text-muted-foreground mt-2">
-            Share this link with the student to access their files and submit homework
+            Ask the student to sign in with the same Google email shown on this profile. After you invite that email, they must accept from their student dashboard before tutor-shared files, homework, plans, notes, progress, chat, and video links appear.
           </p>
         </CardContent>
       </Card>

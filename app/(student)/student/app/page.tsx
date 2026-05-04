@@ -17,7 +17,7 @@ export default async function StudentAppPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, name, email, role, student_invite_code')
+    .select('id, name, email, role')
     .eq('id', user.id)
     .single()
 
@@ -31,14 +31,43 @@ export default async function StudentAppPage() {
 
   const rangeStart = new Date()
   const rangeEnd = new Date(rangeStart.getTime() + 30 * 24 * 60 * 60 * 1000)
+  const normalizedProfileEmail = profile.email?.trim().toLowerCase()
+
+  if (normalizedProfileEmail) {
+    const { data: unlinkedMatchingStudents } = await service
+      .from('students')
+      .select('id')
+      .is('auth_user_id', null)
+      .ilike('email', normalizedProfileEmail)
+
+    if ((unlinkedMatchingStudents || []).length > 0) {
+      await service
+        .from('students')
+        .update({
+          auth_user_id: user.id,
+          invitation_status: 'pending',
+          invited_at: new Date().toISOString(),
+          declined_at: null,
+        })
+        .in('id', unlinkedMatchingStudents!.map((student) => student.id))
+    }
+  }
 
   const { data: connections } = await service
     .from('students')
-    .select('id, user_id, name, email, zoom_meeting_link')
+    .select('id, user_id, name, email, zoom_meeting_link, invitation_status')
     .eq('auth_user_id', user.id)
+    .eq('invitation_status', 'active')
     .order('created_at', { ascending: false })
 
-  const tutorIds = Array.from(new Set((connections || []).map((c) => c.user_id)))
+  const { data: pendingInvitations } = await service
+    .from('students')
+    .select('id, user_id, name, email, zoom_meeting_link, invitation_status, invited_at')
+    .eq('auth_user_id', user.id)
+    .eq('invitation_status', 'pending')
+    .order('invited_at', { ascending: false })
+
+  const tutorIds = Array.from(new Set([...(connections || []), ...(pendingInvitations || [])].map((c) => c.user_id)))
 
   const { data: tutors } = tutorIds.length
     ? await service
@@ -56,6 +85,19 @@ export default async function StudentAppPage() {
       name: connection.name,
       email: connection.email,
       zoom_meeting_link: connection.zoom_meeting_link,
+      tutorName: tutor?.name || 'Tutor',
+      tutorEmail: tutor?.email || null,
+    }
+  })
+
+  const decoratedPendingInvitations = (pendingInvitations || []).map((connection) => {
+    const tutor = tutorMap.get(connection.user_id)
+    return {
+      id: connection.id,
+      name: connection.name,
+      email: connection.email,
+      zoom_meeting_link: connection.zoom_meeting_link,
+      invited_at: connection.invited_at,
       tutorName: tutor?.name || 'Tutor',
       tutorEmail: tutor?.email || null,
     }
@@ -191,8 +233,8 @@ export default async function StudentAppPage() {
     <StudentAppContent
       studentName={profile.name || 'Student'}
       studentEmail={profile.email || null}
-      studentInviteCode={profile.student_invite_code}
       connections={decoratedConnections}
+      pendingInvitations={decoratedPendingInvitations}
       homework={homework || []}
       files={files || []}
       submissions={submissions || []}

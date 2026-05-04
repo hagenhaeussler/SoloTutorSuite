@@ -5,7 +5,7 @@ import {
   studentSchema,
   homeworkSchema,
   zoomMeetingLinkSchema,
-  studentInviteCodeSchema,
+  studentEmailInviteSchema,
   chatMessageSchema,
   updateStudentProfileSchema,
   lessonNoteSchema,
@@ -13,6 +13,7 @@ import {
   progressShareLinkSchema,
   mockSubscriptionOfferSchema,
   type StudentInput,
+  type StudentEmailInviteInput,
   type HomeworkInput,
   type UpdateStudentProfileInput,
   type MockSubscriptionOfferInput,
@@ -21,6 +22,7 @@ import {
 export async function addStudentAction(data: StudentInput) {
   try {
     const supabase = await createClient()
+    const service = await createServiceClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
@@ -28,22 +30,104 @@ export async function addStudentAction(data: StudentInput) {
     }
 
     const validated = studentSchema.parse(data)
+    const normalizedEmail = validated.email?.trim().toLowerCase()
+    let linkedAuthUserId: string | null = null
+    let invitationStatus: 'active' | 'pending' = 'active'
 
-    const { error } = await supabase
+    if (normalizedEmail) {
+      const { data: studentProfile } = await service
+        .from('profiles')
+        .select('id, email, role')
+        .ilike('email', normalizedEmail)
+        .eq('role', 'student')
+        .maybeSingle()
+
+      if (studentProfile) {
+        linkedAuthUserId = studentProfile.id
+        invitationStatus = 'pending'
+      }
+    }
+
+    if (linkedAuthUserId) {
+      const { data: existingLinkedStudent } = await service
+        .from('students')
+        .select('id, invitation_status')
+        .eq('user_id', user.id)
+        .eq('auth_user_id', linkedAuthUserId)
+        .maybeSingle()
+
+      if (existingLinkedStudent?.invitation_status === 'active') {
+        return { error: 'That student account is already connected to your Students Hub.' }
+      }
+
+      if (existingLinkedStudent) {
+        const { error: updateError } = await service
+          .from('students')
+          .update({
+            invitation_status: 'pending',
+            invited_at: new Date().toISOString(),
+            declined_at: null,
+          })
+          .eq('id', existingLinkedStudent.id)
+          .eq('user_id', user.id)
+
+        if (updateError) throw updateError
+        return { success: true, invitedExistingStudent: true }
+      }
+
+      if (normalizedEmail) {
+        const { data: unlinkedStudent } = await service
+          .from('students')
+          .select('id')
+          .eq('user_id', user.id)
+          .is('auth_user_id', null)
+          .ilike('email', normalizedEmail)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+
+        if (unlinkedStudent) {
+          const { error: updateError } = await service
+            .from('students')
+            .update({
+              auth_user_id: linkedAuthUserId,
+              name: validated.name,
+              email: normalizedEmail,
+              parent_contact: validated.parent_contact || null,
+              subject_exam_type: validated.subject_exam_type || null,
+              notes: validated.notes || null,
+              status: validated.status,
+              invitation_status: 'pending',
+              invited_at: new Date().toISOString(),
+              declined_at: null,
+            })
+            .eq('id', unlinkedStudent.id)
+            .eq('user_id', user.id)
+
+          if (updateError) throw updateError
+          return { success: true, invitedExistingStudent: true }
+        }
+      }
+    }
+
+    const { error } = await service
       .from('students')
       .insert({
         user_id: user.id,
         name: validated.name,
-        email: validated.email || null,
+        auth_user_id: linkedAuthUserId,
+        email: normalizedEmail || null,
         parent_contact: validated.parent_contact || null,
         subject_exam_type: validated.subject_exam_type || null,
         notes: validated.notes || null,
         status: validated.status,
+        invitation_status: invitationStatus,
+        invited_at: invitationStatus === 'pending' ? new Date().toISOString() : null,
       })
 
     if (error) throw error
 
-    return { success: true }
+    return { success: true, invitedExistingStudent: invitationStatus === 'pending' }
   } catch (error: any) {
     console.error('Error adding student:', error)
     return { error: error.message || 'Failed to add student' }
@@ -83,7 +167,7 @@ export async function updateStudentProfileAction(data: UpdateStudentProfileInput
   }
 }
 
-export async function addStudentByInviteCodeAction(inviteCodeInput: string) {
+export async function inviteStudentByEmailAction(data: StudentEmailInviteInput) {
   try {
     const supabase = await createClient()
     const service = await createServiceClient()
@@ -95,78 +179,99 @@ export async function addStudentByInviteCodeAction(inviteCodeInput: string) {
       return { error: 'Not authenticated' }
     }
 
-    const inviteCode = studentInviteCodeSchema.parse(inviteCodeInput.trim().toUpperCase())
+    const { email } = studentEmailInviteSchema.parse(data)
+    const normalizedEmail = email.trim().toLowerCase()
 
     const { data: studentProfile } = await service
       .from('profiles')
       .select('id, name, email, role')
-      .eq('student_invite_code', inviteCode)
+      .ilike('email', normalizedEmail)
       .maybeSingle()
 
     if (!studentProfile || studentProfile.role !== 'student') {
-      return { error: 'Student ID not found' }
+      return {
+        error: 'No student account was found for that email. Ask the student to sign up with Google first, then invite that exact email.',
+      }
     }
 
     const { data: existing } = await service
       .from('students')
-      .select('id')
+      .select('id, invitation_status')
       .eq('user_id', user.id)
       .eq('auth_user_id', studentProfile.id)
       .maybeSingle()
 
     if (existing) {
-      return { success: true, alreadyExists: true }
+      if (existing.invitation_status === 'active') {
+        return { success: true, alreadyExists: true }
+      }
+
+      const { error: updateError } = await service
+        .from('students')
+        .update({
+          invitation_status: 'pending',
+          invited_at: new Date().toISOString(),
+          declined_at: null,
+        })
+        .eq('id', existing.id)
+        .eq('user_id', user.id)
+
+      if (updateError) throw updateError
+      return { success: true, invited: true }
     }
 
-    const normalizedStudentEmail = studentProfile.email?.trim().toLowerCase()
+    const { data: tutorStudents } = await service
+      .from('students')
+      .select('id, email, auth_user_id')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
 
-    if (normalizedStudentEmail) {
-      const { data: tutorStudents } = await service
+    const matchingStudents = (tutorStudents || []).filter(
+      (student) => student.email?.trim().toLowerCase() === normalizedEmail
+    )
+    const linkedToDifferentAccount = matchingStudents.find(
+      (student) => student.auth_user_id && student.auth_user_id !== studentProfile.id
+    )
+
+    if (linkedToDifferentAccount) {
+      return {
+        error: 'A student with that email is already linked to a different student account.',
+      }
+    }
+
+    const unlinkedStudent = matchingStudents.find((student) => !student.auth_user_id)
+    if (unlinkedStudent) {
+      const { error: updateError } = await service
         .from('students')
-        .select('id, email, auth_user_id')
+        .update({
+          auth_user_id: studentProfile.id,
+          email: normalizedEmail,
+          invitation_status: 'pending',
+          invited_at: new Date().toISOString(),
+          declined_at: null,
+        })
+        .eq('id', unlinkedStudent.id)
         .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
 
-      const matchingStudents = (tutorStudents || []).filter(
-        (student) => student.email?.trim().toLowerCase() === normalizedStudentEmail
-      )
-      const unlinkedStudent = matchingStudents.find((student) => !student.auth_user_id)
-
-      if (unlinkedStudent) {
-        const { error: updateError } = await service
-          .from('students')
-          .update({
-            auth_user_id: studentProfile.id,
-            email: unlinkedStudent.email || studentProfile.email,
-          })
-          .eq('id', unlinkedStudent.id)
-          .eq('user_id', user.id)
-
-        if (updateError) throw updateError
-
-        return { success: true, linkedExisting: true }
-      }
-
-      if (matchingStudents.some((student) => student.auth_user_id && student.auth_user_id !== studentProfile.id)) {
-        return {
-          error: 'A student with that email is already linked to a different student account.',
-        }
-      }
+      if (updateError) throw updateError
+      return { success: true, linkedExisting: true, invited: true }
     }
 
     const { error } = await service.from('students').insert({
       user_id: user.id,
       auth_user_id: studentProfile.id,
       name: studentProfile.name || 'Student',
-      email: studentProfile.email || null,
+      email: normalizedEmail,
+      invitation_status: 'pending',
+      invited_at: new Date().toISOString(),
     })
 
     if (error) throw error
 
-    return { success: true }
+    return { success: true, invited: true }
   } catch (error: any) {
-    console.error('Error adding student by invite code:', error)
-    return { error: error.message || 'Failed to add student by ID' }
+    console.error('Error inviting student by email:', error)
+    return { error: error.message || 'Failed to invite student by email' }
   }
 }
 

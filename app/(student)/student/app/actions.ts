@@ -33,6 +33,7 @@ export async function submitHomeworkByAuthAction(formData: FormData) {
       .select('id, user_id')
       .eq('id', homework.student_id)
       .eq('auth_user_id', user.id)
+      .eq('invitation_status', 'active')
       .single()
 
     if (!student) return { error: 'Access denied' }
@@ -79,6 +80,7 @@ export async function sendStudentChatMessageAction(studentId: string, messageInp
       .select('id, user_id')
       .eq('id', studentId)
       .eq('auth_user_id', user.id)
+      .eq('invitation_status', 'active')
       .single()
 
     if (!student) return { error: 'Access denied' }
@@ -126,6 +128,7 @@ export async function toggleStudentMilestoneAction(milestoneId: string, achieved
       .select('id')
       .eq('id', milestone.student_id)
       .eq('auth_user_id', user.id)
+      .eq('invitation_status', 'active')
       .single()
 
     if (!student) return { error: 'Access denied' }
@@ -170,6 +173,7 @@ export async function buyMockSubscriptionAction(subscriptionId: string) {
       .select('id')
       .eq('id', subscription.student_id)
       .eq('auth_user_id', user.id)
+      .eq('invitation_status', 'active')
       .single()
 
     if (!student) return { error: 'Access denied' }
@@ -216,6 +220,7 @@ export async function cancelStudentMockSubscriptionAction(subscriptionId: string
       .select('id')
       .eq('id', subscription.student_id)
       .eq('auth_user_id', user.id)
+      .eq('invitation_status', 'active')
       .single()
 
     if (!student) return { error: 'Access denied' }
@@ -256,6 +261,7 @@ export async function createStudentCalendarEventAction(data: AppCalendarEventInp
         .select('id')
         .eq('id', validated.student_id)
         .eq('auth_user_id', user.id)
+        .eq('invitation_status', 'active')
         .single()
 
       if (!student) return { error: 'Access denied' }
@@ -320,6 +326,83 @@ export async function createStudentCalendarEventAction(data: AppCalendarEventInp
   } catch (error: any) {
     console.error('Error creating student calendar event:', error)
     return { error: error.message || 'Failed to create calendar event' }
+  }
+}
+
+export async function acceptTutorInvitationAction(studentId: string) {
+  try {
+    const supabase = await createClient()
+    const service = await createServiceClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Not authenticated' }
+
+    const { data: student } = await service
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .eq('auth_user_id', user.id)
+      .eq('invitation_status', 'pending')
+      .single()
+
+    if (!student) return { error: 'Invitation not found' }
+
+    const { error } = await service
+      .from('students')
+      .update({
+        invitation_status: 'active',
+        accepted_at: new Date().toISOString(),
+        declined_at: null,
+      })
+      .eq('id', student.id)
+      .eq('auth_user_id', user.id)
+
+    if (error) throw error
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error accepting tutor invitation:', error)
+    return { error: error.message || 'Failed to accept invitation' }
+  }
+}
+
+export async function declineTutorInvitationAction(studentId: string) {
+  try {
+    const supabase = await createClient()
+    const service = await createServiceClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return { error: 'Not authenticated' }
+
+    const { data: student } = await service
+      .from('students')
+      .select('id')
+      .eq('id', studentId)
+      .eq('auth_user_id', user.id)
+      .eq('invitation_status', 'pending')
+      .single()
+
+    if (!student) return { error: 'Invitation not found' }
+
+    const { error } = await service
+      .from('students')
+      .update({
+        invitation_status: 'declined',
+        declined_at: new Date().toISOString(),
+      })
+      .eq('id', student.id)
+      .eq('auth_user_id', user.id)
+
+    if (error) throw error
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Error declining tutor invitation:', error)
+    return { error: error.message || 'Failed to decline invitation' }
   }
 }
 

@@ -37,6 +37,8 @@ import {
   buyMockSubscriptionAction,
   cancelStudentMockSubscriptionAction,
   createStudentCalendarEventAction,
+  acceptTutorInvitationAction,
+  declineTutorInvitationAction,
   listStudentGoogleEventsAction,
   sendStudentChatMessageAction,
   submitHomeworkByAuthAction,
@@ -46,6 +48,10 @@ import {
 type StudentConnection = Pick<Student, 'id' | 'name' | 'email' | 'zoom_meeting_link'> & {
   tutorName: string
   tutorEmail: string | null
+}
+
+type PendingTutorInvitation = StudentConnection & {
+  invited_at: string | null
 }
 
 type StudentBooking = {
@@ -90,8 +96,8 @@ const getRangeIso = (startDate: string, endDate: string) => {
 interface StudentAppContentProps {
   studentName: string
   studentEmail: string | null
-  studentInviteCode: string | null
   connections: StudentConnection[]
+  pendingInvitations: PendingTutorInvitation[]
   homework: Homework[]
   files: StudentFile[]
   submissions: HomeworkSubmission[]
@@ -111,8 +117,8 @@ interface StudentAppContentProps {
 export function StudentAppContent({
   studentName,
   studentEmail,
-  studentInviteCode,
   connections,
+  pendingInvitations,
   homework,
   files,
   submissions,
@@ -138,6 +144,7 @@ export function StudentAppContent({
   const [celebratingMilestoneId, setCelebratingMilestoneId] = useState<string | null>(null)
   const [optimisticMilestoneStatuses, setOptimisticMilestoneStatuses] = useState<Record<string, ProgressMilestone['status']>>({})
   const [subscriptionUpdatingId, setSubscriptionUpdatingId] = useState<string | null>(null)
+  const [invitationUpdatingId, setInvitationUpdatingId] = useState<string | null>(null)
   const [creatingCalendarEvent, setCreatingCalendarEvent] = useState(false)
   const [syncingGoogle, setSyncingGoogle] = useState(false)
   const [googleCalendarEvents, setGoogleCalendarEvents] = useState(googleEvents)
@@ -426,6 +433,38 @@ export function StudentAppContent({
     }
   }
 
+  const handleAcceptInvitation = async (studentId: string) => {
+    setInvitationUpdatingId(studentId)
+    try {
+      const result = await acceptTutorInvitationAction(studentId)
+      if (result.error) throw new Error(result.error)
+
+      toast({ title: 'Invitation accepted', description: 'Your tutor workspace is now available.' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setInvitationUpdatingId(null)
+    }
+  }
+
+  const handleDeclineInvitation = async (studentId: string) => {
+    if (!confirm('Decline this tutor invitation?')) return
+
+    setInvitationUpdatingId(studentId)
+    try {
+      const result = await declineTutorInvitationAction(studentId)
+      if (result.error) throw new Error(result.error)
+
+      toast({ title: 'Invitation declined' })
+      router.refresh()
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' })
+    } finally {
+      setInvitationUpdatingId(null)
+    }
+  }
+
   const handleCreateCalendarEvent = async () => {
     const startIso = fromDateTimeLocalValue(newCalendarEvent.start_ts)
     const endIso = fromDateTimeLocalValue(newCalendarEvent.end_ts)
@@ -540,7 +579,7 @@ export function StudentAppContent({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline">ID: {studentInviteCode || 'Pending'}</Badge>
+            {studentEmail && <Badge variant="outline">{studentEmail}</Badge>}
             <Button variant="ghost" size="sm" className="gap-2" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
               Sign Out
@@ -624,14 +663,60 @@ export function StudentAppContent({
           </CardContent>
         </Card>
 
+        {pendingInvitations.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Tutor Invitations</CardTitle>
+              <CardDescription>
+                Accept an invitation before that tutor can share files, homework, billing plans, notes, progress, chat, and video links in your dashboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {pendingInvitations.map((invitation) => {
+                  const updating = invitationUpdatingId === invitation.id
+
+                  return (
+                    <div key={invitation.id} className="rounded-lg border p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{invitation.tutorName}</p>
+                            <Badge variant="warning">pending</Badge>
+                          </div>
+                          {invitation.tutorEmail && (
+                            <p className="text-sm text-muted-foreground">{invitation.tutorEmail}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Invited {invitation.invited_at ? formatDate(invitation.invited_at) : 'recently'}
+                          </p>
+                        </div>
+                        <div className="flex flex-shrink-0 gap-2">
+                          <Button onClick={() => handleAcceptInvitation(invitation.id)} disabled={updating}>
+                            {updating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Accept
+                          </Button>
+                          <Button variant="outline" onClick={() => handleDeclineInvitation(invitation.id)} disabled={updating}>
+                            Decline
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {connections.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center">
-              <h2 className="text-xl font-semibold mb-2">You&apos;re all set 🎉</h2>
+              <h2 className="text-xl font-semibold mb-2">Student account ready</h2>
               <p className="text-muted-foreground mb-3">
-                Share your Student ID with your tutor so they can add you to their Students Hub.
+                Ask your tutor to invite the exact Google email you used here. Their workspace appears after you accept the invitation.
               </p>
-              <code className="text-sm bg-gray-100 px-2 py-1 rounded">{studentInviteCode || 'Generating...'}</code>
+              {studentEmail && <code className="text-sm bg-gray-100 px-2 py-1 rounded">{studentEmail}</code>}
             </CardContent>
           </Card>
         ) : (

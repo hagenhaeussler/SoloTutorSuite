@@ -12,9 +12,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
-import { GraduationCap, Plus, Loader2, Copy, ExternalLink, Search, Link2 } from 'lucide-react'
+import { GraduationCap, Plus, Loader2, Copy, ExternalLink, Search, Mail } from 'lucide-react'
 import type { Student } from '@/lib/types'
-import { addStudentAction, addStudentByInviteCodeAction } from './actions'
+import { addStudentAction, inviteStudentByEmailAction } from './actions'
 import { formatDate } from '@/lib/utils'
 
 interface StudentsContentProps {
@@ -24,8 +24,8 @@ interface StudentsContentProps {
 export function StudentsContent({ students }: StudentsContentProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [searchingById, setSearchingById] = useState(false)
-  const [studentInviteCode, setStudentInviteCode] = useState('')
+  const [invitingByEmail, setInvitingByEmail] = useState(false)
+  const [studentInviteEmail, setStudentInviteEmail] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | Student['status']>('all')
   const [name, setName] = useState('')
@@ -76,7 +76,12 @@ export function StudentsContent({ students }: StudentsContentProps) {
         status,
       })
       if (result.error) throw new Error(result.error)
-      toast({ title: 'Student added!' })
+      toast({
+        title: result.invitedExistingStudent ? 'Student invited!' : 'Student added!',
+        description: result.invitedExistingStudent
+          ? 'That email belongs to a student account. They need to accept the invitation before seeing this workspace.'
+          : undefined,
+      })
       setDialogOpen(false)
       setName('')
       setEmail('')
@@ -92,37 +97,37 @@ export function StudentsContent({ students }: StudentsContentProps) {
     }
   }
 
-  const copyLink = (token: string) => {
-    const url = `${window.location.origin}/student/${token}`
+  const copyStudentSignupLink = () => {
+    const url = `${window.location.origin}/login?role=student`
     navigator.clipboard.writeText(url)
-    toast({ title: 'Link copied!' })
+    toast({ title: 'Student signup link copied!' })
   }
 
-  const handleAddByInviteCode = async () => {
-    if (!studentInviteCode.trim()) {
-      toast({ title: 'Enter a student ID', variant: 'destructive' })
+  const handleInviteByEmail = async () => {
+    if (!studentInviteEmail.trim()) {
+      toast({ title: 'Enter a student email', variant: 'destructive' })
       return
     }
 
-    setSearchingById(true)
+    setInvitingByEmail(true)
     try {
-      const result = await addStudentByInviteCodeAction(studentInviteCode)
+      const result = await inviteStudentByEmailAction({ email: studentInviteEmail })
       if (result.error) throw new Error(result.error)
 
       if (result.alreadyExists) {
-        toast({ title: 'Already linked', description: 'That student is already in your Students Hub.' })
+        toast({ title: 'Already connected', description: 'That student is already active in your Students Hub.' })
       } else if (result.linkedExisting) {
-        toast({ title: 'Existing student linked!', description: 'The student profile you already created is now connected to their student account.' })
+        toast({ title: 'Invitation sent!', description: 'Your existing student profile is now waiting for the student to accept.' })
       } else {
-        toast({ title: 'Student linked!', description: 'The student was added via their student ID.' })
+        toast({ title: 'Invitation sent!', description: 'The student will see it when they sign in with that Google account.' })
       }
 
-      setStudentInviteCode('')
+      setStudentInviteEmail('')
       router.refresh()
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' })
     } finally {
-      setSearchingById(false)
+      setInvitingByEmail(false)
     }
   }
 
@@ -220,27 +225,37 @@ export function StudentsContent({ students }: StudentsContentProps) {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Search className="w-5 h-5" />
-            Add Student by Student ID
+            <Mail className="w-5 h-5" />
+            Invite Student by Email
           </CardTitle>
           <CardDescription>
-            Students can share their personal ID so you can add them directly, or link a profile you already created with the same email.
+            Invite a student who already signed up with Google. If you already created a student with this email, we will link that profile after they accept.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-2">
             <Input
-              value={studentInviteCode}
-              onChange={(e) => setStudentInviteCode(e.target.value)}
-              placeholder="e.g. STU-1A2B3C4D"
+              type="email"
+              value={studentInviteEmail}
+              onChange={(e) => setStudentInviteEmail(e.target.value)}
+              placeholder="student@gmail.com"
             />
-            <Button onClick={handleAddByInviteCode} disabled={searchingById}>
-              {searchingById ? (
+            <Button onClick={handleInviteByEmail} disabled={invitingByEmail}>
+              {invitingByEmail ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <Link2 className="w-4 h-4 mr-2" />
+                <Mail className="w-4 h-4 mr-2" />
               )}
-              Add by ID
+              Invite
+            </Button>
+          </div>
+          <div className="mt-3 flex flex-col gap-2 rounded-lg border bg-gray-50 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-muted-foreground">
+              Student has not signed up yet? Send them the Google student signup link first.
+            </span>
+            <Button variant="outline" size="sm" onClick={copyStudentSignupLink}>
+              <Copy className="w-4 h-4 mr-2" />
+              Copy Signup Link
             </Button>
           </div>
         </CardContent>
@@ -321,6 +336,12 @@ export function StudentsContent({ students }: StudentsContentProps) {
                       <Badge variant={getStatusVariant(student.status)}>
                         {student.status}
                       </Badge>
+                      {student.invitation_status === 'pending' && (
+                        <Badge variant="warning">invite pending</Badge>
+                      )}
+                      {student.invitation_status === 'declined' && (
+                        <Badge variant="destructive">declined</Badge>
+                      )}
                     </div>
                     {student.email && (
                       <p className="text-sm text-muted-foreground">{student.email}</p>
@@ -339,10 +360,10 @@ export function StudentsContent({ students }: StudentsContentProps) {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => copyLink(student.access_token)}
+                      onClick={copyStudentSignupLink}
                     >
                       <Copy className="w-4 h-4 mr-2" />
-                      Copy Link
+                      Copy Signup
                     </Button>
                     <Link href={`/dashboard/students/${student.id}`}>
                       <Button size="sm">

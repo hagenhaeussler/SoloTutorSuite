@@ -174,6 +174,10 @@ export interface Student {
   subject_exam_type: string | null
   notes: string | null
   status: 'active' | 'inactive' | 'completed' | 'lead'
+  invitation_status: 'pending' | 'active' | 'declined'
+  invited_at: string | null
+  accepted_at: string | null
+  declined_at: string | null
   zoom_meeting_link: string | null
   access_token: string
   created_at: string
