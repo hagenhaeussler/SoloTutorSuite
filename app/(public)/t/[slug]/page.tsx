@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, CheckCircle } from 'lucide-react'
-import { InquiryForm } from './inquiry-form'
 
 export default async function TutorSitePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -163,9 +162,9 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
         </Link>
       </section>
 
-      <section className="container mx-auto px-4 pb-16 max-w-3xl">
-        {(site.contact_email || site.contact_phone) && (
-          <Card className="mb-6">
+      {(site.contact_email || site.contact_phone) && (
+        <section className="container mx-auto px-4 pb-16 max-w-3xl">
+          <Card>
             <CardHeader>
               <CardTitle>Contact Details</CardTitle>
             </CardHeader>
@@ -174,9 +173,8 @@ export default async function TutorSitePage({ params }: { params: Promise<{ slug
               {site.contact_phone && <p>Phone: {site.contact_phone}</p>}
             </CardContent>
           </Card>
-        )}
-        <InquiryForm slug={slug} accentColor={accentColor} />
-      </section>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="border-t py-8">
