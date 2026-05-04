@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
     const state = createGoogleCalendarState({ userId: user.id, returnTo })
     const authorizationUrl = oauthClient.generateAuthUrl({
       access_type: 'offline',
-      prompt: 'consent',
+      prompt: 'select_account consent',
+      login_hint: user.email || undefined,
       include_granted_scopes: true,
       scope: GOOGLE_CALENDAR_SCOPES,
       state,

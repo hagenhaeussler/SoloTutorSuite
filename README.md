@@ -153,5 +153,9 @@ Copy `.env.example` to `.env.local` and fill:
 
 - `GOOGLE_CALENDAR_REDIRECT_URI` must exactly match `https://YOUR_DOMAIN/api/google-calendar/oauth/callback`.
 - Google Cloud OAuth Client > Authorized redirect URIs must include that exact same callback URL.
+- Google Auth Platform > Branding should use:
+  - Homepage: `https://YOUR_DOMAIN`
+  - Privacy policy: `https://YOUR_DOMAIN/privacy`
+  - Terms of service: `https://YOUR_DOMAIN/terms`
 - If the app says "authorized, but no connection row is visible", check `SUPABASE_SERVICE_ROLE_KEY`, run migration `013`, redeploy, then reconnect Google Calendar.
 - The app never returns Google access tokens or refresh tokens to the browser; debug messages only expose safe status/reason codes.

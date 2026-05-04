@@ -137,8 +137,16 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t py-8">
-        <div className="container mx-auto px-4 text-center text-gray-600">
+        <div className="container mx-auto flex flex-col items-center justify-center gap-3 px-4 text-center text-gray-600 sm:flex-row">
           <p>© 2026 SoloTutorSuite. Built to help tutors succeed.</p>
+          <div className="flex items-center gap-3 text-sm">
+            <Link href="/privacy" className="font-medium text-primary">
+              Privacy
+            </Link>
+            <Link href="/terms" className="font-medium text-primary">
+              Terms
+            </Link>
+          </div>
         </div>
       </footer>
     </div>
